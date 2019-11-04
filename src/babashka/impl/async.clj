@@ -64,5 +64,8 @@
    'unsub async/unsub
    'unsub-all async/unsub-all
    'untap async/untap
-   'untap-all async/untap-all})
+   'untap-all async/untap-all
+   ;; go
+   'go (with-meta @#'async/go {:sci/macro true})
+   '<! async/<!})
 

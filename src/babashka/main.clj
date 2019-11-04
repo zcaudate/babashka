@@ -147,7 +147,11 @@ Everything after that is bound to *command-line-args*."))
          file-bindings
          thread-bindings
          integer-bindings
-         exception-bindings))
+         exception-bindings
+         {'clojure.lang.Var/getThreadBindingFrame #(clojure.lang.Var/getThreadBindingFrame)
+          'clojure.lang.Var/resetThreadBindingFrame #(clojure.lang.Var/resetThreadBindingFrame ^Object %)
+          'java.util.concurrent.atomic.AtomicReferenceArray. #(java.util.concurrent.atomic.AtomicReferenceArray. ^long %)
+          'java.lang.Throwable java.lang.Throwable}))
 
 (defn read-edn []
   (edn/read {;;:readers *data-readers*
@@ -206,7 +210,14 @@ Everything after that is bound to *command-line-args*."))
                           'babashka.signal {'pipe-signal-received? pipe-signal-received?}
                           'clojure.java.io io-namespace
                           'me.raynes.conch.low-level conch-namespace
-                          'clojure.core.async async-namespace}
+                          'clojure.core.async async-namespace
+                          'clojure.core.async.impl.dispatch {'run clojure.core.async.impl.dispatch/run}
+                          'clojure.core.async.impl.ioc-macros {'USER-START-IDX clojure.core.async.impl.ioc-macros/USER-START-IDX
+                                                               'BINDINGS-IDX clojure.core.async.impl.ioc-macros/BINDINGS-IDX
+                                                               'run-state-machine-wrapped clojure.core.async.impl.ioc-macros/run-state-machine-wrapped
+                                                               'aget-object clojure.core.async.impl.ioc-macros/aget-object
+                                                               'aset-object clojure.core.async.impl.ioc-macros/aset-object
+                                                               'aset-all! (with-meta @#'clojure.core.async.impl.ioc-macros/aset-all! {:sci/macro true})}}
              :bindings (assoc bindings '*command-line-args* command-line-args)
              :env env
              :features #{:bb}}
