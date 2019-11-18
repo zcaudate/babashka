@@ -5,7 +5,7 @@
    [babashka.impl.clojure.core :refer [core-extras]]
    [babashka.impl.clojure.java.io :refer [io-namespace]]
    [babashka.impl.clojure.stacktrace :refer [print-stack-trace]]
-   [babashka.impl.conch :refer [conch-namespace]]
+   [babashka.impl.conch :refer [conch-namespace conch-ll-namespace]]
    [babashka.impl.csv :as csv]
    [babashka.impl.pipe-signal-handler :refer [handle-pipe! pipe-signal-received?]]
    [babashka.impl.socket-repl :as socket-repl]
@@ -194,7 +194,8 @@ Everything after that is bound to *command-line-args*."))
                         sig babashka.signal
                         shell clojure.java.shell
                         io clojure.java.io
-                        conch me.raynes.conch.low-level
+                        conch me.raynes.conch
+                        conch.ll me.raynes.conch.low-level
                         async clojure.core.async
                         csv clojure.data.csv}
              :namespaces {'clojure.core core-extras
@@ -205,7 +206,8 @@ Everything after that is bound to *command-line-args*."))
                                           'wait-for-path wait/wait-for-path}
                           'babashka.signal {'pipe-signal-received? pipe-signal-received?}
                           'clojure.java.io io-namespace
-                          'me.raynes.conch.low-level conch-namespace
+                          'me.raynes.conch conch-namespace
+                          'me.raynes.conch.low-level conch-ll-namespace
                           'clojure.core.async async-namespace
                           'clojure.data.csv csv/csv-namespace}
              :bindings {'*command-line-args* command-line-args
