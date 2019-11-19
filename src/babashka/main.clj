@@ -195,7 +195,6 @@ Everything after that is bound to *command-line-args*."))
                         shell clojure.java.shell
                         io clojure.java.io
                         conch me.raynes.conch
-                        conch.ll me.raynes.conch.low-level
                         async clojure.core.async
                         csv clojure.data.csv}
              :namespaces {'clojure.core core-extras

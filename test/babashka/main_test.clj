@@ -171,8 +171,9 @@
   (is (= 6 (bb nil "@(future (+ 1 2 3))"))))
 
 (deftest conch-test
-  (is (str/includes? (bb nil "(->> (conch/proc \"ls\") (conch/stream-to-string :out))")
-                     "LICENSE")))
+  (is (str/includes? (bb nil "
+      (require '[me.raynes.conch.low-level :as ll])
+      (->> (ll/proc \"ls\") (ll/stream-to-string :out))") "LICENSE")))
 
 (deftest create-temp-file-test
   (let [temp-dir-path (System/getProperty "java.io.tmpdir")]
@@ -186,9 +187,10 @@
 
 (deftest wait-for-port-test
   (is (= :timed-out
-       (bb nil "(def web-server (conch/proc \"python\" \"-m\" \"SimpleHTTPServer\" \"7171\"))
+       (bb nil "(require '[me.raynes.conch.low-level :as ll])
+                (def web-server (ll/proc \"python\" \"-m\" \"SimpleHTTPServer\" \"7171\"))
                 (wait/wait-for-port \"127.0.0.1\" 7171)
-                (conch/destroy web-server)
+                (ll/destroy web-server)
                 (wait/wait-for-port \"localhost\" 7172 {:default :timed-out :timeout 50})"))))
 
 (deftest wait-for-path-test
