@@ -25,8 +25,25 @@
            `(defn ~name [& ~'args]
               (apply ~'me.raynes.conch/execute ~(str name) ~'args)))))
 
+(defn program-form [prog]
+  `(fn [& args#] (apply ~'me.raynes.conch/execute ~prog args#)))
+
+(defn let-programs
+  [_ _ bindings & body]
+  `(let [~@(conch/map-nth #(program-form %) 1 2 bindings)]
+     ~@body))
+
+(defn with-programs
+  [_ _ programs & body]
+  `(let [~@(interleave programs (map (comp program-form str) programs))]
+     ~@body))
+
 (def conch-namespace
   {;; main API
    'execute conch/execute
+   'let-programs (with-meta let-programs
+                    {:sci/macro true})
+   'with-programs (with-meta with-programs
+                    {:sci/macro true})
    'programs (with-meta programs
                {:sci/macro true})})

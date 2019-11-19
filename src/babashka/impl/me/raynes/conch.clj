@@ -1,4 +1,5 @@
 (ns babashka.impl.me.raynes.conch
+  {:no-doc true}
   (:require [babashka.impl.me.raynes.conch.low-level :as conch]
             [clojure.java.io :as io]
             [clojure.string :as string])
@@ -255,7 +256,7 @@
            `(defn ~name [& ~'args]
               (apply execute ~(str name) ~'args)))))
 
-(defn- program-form [prog]
+(defn program-form [prog]
   `(fn [& args#] (apply execute ~prog args#)))
 
 (defn map-nth
