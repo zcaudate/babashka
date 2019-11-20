@@ -79,6 +79,8 @@
     (with-open [writer (java.io.PrintWriter. (:in proc))]
       (binding [*out* writer]
         (doseq [x s]
+          (binding [*out* (io/writer System/out)]
+            (println "drink..."))
           (println x))))
     (conch/done proc)))
 
@@ -106,6 +108,7 @@
     (conch/done proc)))
 
 (defn get-drunk [item proc]
+  (prn "GET DRUNK" item proc)
   (drink
    (if (coll? item)
      (seq item)
@@ -209,6 +212,7 @@
             exit-code (future (if timeout
                                 (conch/exit-code proc timeout)
                                 (conch/exit-code proc)))]
+        (prn "IN" (type in))
         (when in (future (get-drunk in proc)))
         (let [proc-out (future (redirect out options :out proc))
               proc-err (future (redirect err options :err proc))
