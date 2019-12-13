@@ -351,7 +351,7 @@
         (> (.lastModified deps-edn-file)
            (.lastModified cp-file)))))
 
-(when true ;;stale
+(when stale
   (sh/sh java-cmd "-Xms256m"
          "-classpath" tools-cp
          "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
