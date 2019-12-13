@@ -42,7 +42,7 @@
           {:jvm-opts []}
           *command-line-args*))
 
-(prn (parse-command-line-args))
+;; (prn (parse-command-line-args))
 
 (require '[clojure.java.shell :as sh])
 
@@ -75,7 +75,7 @@
                               files)]
                 (.getCanonicalPath jar)))
 
-(println tools-cp)
+;; (println tools-cp)
 
 ;; TODO help
 
@@ -332,6 +332,37 @@
 ;; if "$verbose"; then
 ;; echo "Refreshing classpath"
 ;; fi
+
+(def config-project "deps.edn")
+
+;; TODO:
+(def val* "123123")
+(def ck (:out (sh/sh "cksum" :in val*)))
+
+(def cache-dir (io/file ".cpcache"))
+(def libs-file (io/file cache-dir (str ck ".libs")))
+(def cp-file (io/file cache-dir (str ck ".cp")))
+(def jvm-file (io/file cache-dir (str ck ".jvm")))
+(def main-file (io/file cache-dir (str ck ".main")))
+
+(def stale
+  (let [deps-edn-file (io/file config-project)]
+    (or (not (.exists cp-file))
+        (> (.lastModified deps-edn-file)
+           (.lastModified cp-file)))))
+
+(when true ;;stale
+  (sh/sh java-cmd "-Xms256m"
+         "-classpath" tools-cp
+         "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
+         ;; "--config-user" ""
+         "--config-project" config-project
+         "--libs-file" (str libs-file)
+         "--cp-file" (str cp-file)
+         "--jvm-file" (str jvm-file)
+         "--main-file" (str main-file)))
+
+(println (slurp cp-file))
 
 ;; "$JAVA_CMD" -Xms256m -classpath "$tools_cp" clojure.main -m clojure.tools.deps.alpha.script.make-classpath2 --config-user "$config_user" --config-project "$config_project" --libs-file "$libs_file" --cp-file "$cp_file" --jvm-file "$jvm_file" --main-file "$main_file" "${tools_args[@]}"
 ;; fi
