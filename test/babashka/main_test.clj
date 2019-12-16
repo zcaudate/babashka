@@ -5,10 +5,12 @@
    [clojure.edn :as edn]
    [clojure.java.shell :refer [sh]]
    [clojure.string :as str]
-   [clojure.test :as test :refer [deftest is testing]]))
+   [clojure.test :as test :refer [deftest is testing]]
+   [clojure.java.io :as io]
+   [sci.core :as sci]))
 
 (defn bb [input & args]
-  (edn/read-string (apply test-utils/bb (str input) (map str args))))
+  (edn/read-string (apply test-utils/bb (when (some? input) (str input)) (map str args))))
 
 (deftest parse-opts-test
   (is (= {:expression "(println 123)"}
@@ -81,6 +83,9 @@
                 "(map-indexed #(-> [%1 %2]) *in*)")
             (bb "(keep #(when (re-find #\"(?i)clojure\" (second %)) (first %)) *in*)"))))))
 
+(deftest println-test
+  (is (= "hello\n" (test-utils/bb nil "(println \"hello\")"))))
+
 (deftest input-test
   (testing "bb doesn't wait for input if *in* isn't used"
     (is (= "2\n" (with-out-str (main/main "(inc 1)"))))))
@@ -92,29 +97,20 @@
       (is (not-empty s))))
   (let [out (java.io.StringWriter.)
         err (java.io.StringWriter.)
-        exit-code (binding [*out* out *err* err]
-                    (main/main "--time" "(println \"Hello world!\") (System/exit 42)"))]
+        exit-code (sci/with-bindings {sci/out out
+                                      sci/err err}
+                    (binding [*out* out *err* err]
+                      (main/main "--time" "(println \"Hello world!\") (System/exit 42)")))]
     (is (= (str out) "Hello world!\n"))
     (is (re-find #"took" (str err)))
     (is (= 42 exit-code))))
 
 (deftest malformed-command-line-args-test
   (is (thrown-with-msg? Exception #"File does not exist: non-existing\n"
-                        (bb nil "-f" "non-existing")))
-  (testing "no arguments prints help"
-    (is (str/includes?
-         (try (test-utils/bb nil)
-              (catch clojure.lang.ExceptionInfo e
-                (:stdout (ex-data e))))
-         "Usage:"))))
+                        (bb nil "-f" "non-existing"))))
 
 (deftest ssl-test
-  (let [graalvm-home (System/getenv "GRAALVM_HOME")
-        lib-path (format "%1$s/jre/lib:%1$s/jre/lib/amd64" graalvm-home)
-        ;; _ (prn "lib-path" lib-path)
-        resp (bb nil (format "(System/setProperty \"java.library.path\" \"%s\")
-                              (slurp \"https://www.google.com\")"
-                             lib-path))]
+  (let [resp (bb nil "(slurp \"https://www.google.com\")")]
     (is (re-find #"doctype html" resp))))
 
 (deftest stream-test
@@ -131,10 +127,16 @@
     (is (= "120\n" (test-utils/bb nil (format "(load-file \"%s\") (bar (foo 10 30) 3)"
                                               (.getPath tmp)))))))
 
+(deftest eval-test
+  (is (= "120\n" (test-utils/bb nil "(eval '(do (defn foo [x y] (+ x y))
+                                                (defn bar [x y] (* x y))
+                                                (bar (foo 10 30) 3)))"))))
+
 (deftest preloads-test
   ;; THIS TEST REQUIRES:
   ;; export BABASHKA_PRELOADS='(defn __bb__foo [] "foo") (defn __bb__bar [] "bar")'
-  (is (= "foobar" (bb nil "(str (__bb__foo) (__bb__bar))"))))
+  (when (System/getenv "BABASHKA_PRELOADS_TEST")
+    (is (= "foobar" (bb nil "(str (__bb__foo) (__bb__bar))")))))
 
 (deftest io-test
   (is (true? (bb nil "(.exists (io/file \"README.md\"))")))
@@ -171,16 +173,16 @@
 (deftest create-temp-file-test
   (let [temp-dir-path (System/getProperty "java.io.tmpdir")]
     (is (= true
-          (bb nil (format "(let [tdir (io/file \"%s\")
+           (bb nil (format "(let [tdir (io/file \"%s\")
                                  tfile
                                  (File/createTempFile \"ctf\" \"tmp\" tdir)]
                              (.deleteOnExit tfile) ; for cleanup
                              (.exists tfile))"
-                    temp-dir-path))))))
+                           temp-dir-path))))))
 
 (deftest wait-for-port-test
   (is (= :timed-out
-       (bb nil "(def web-server (conch/proc \"python\" \"-m\" \"SimpleHTTPServer\" \"7171\"))
+         (bb nil "(def web-server (conch/proc \"python\" \"-m\" \"SimpleHTTPServer\" \"7171\"))
                 (wait/wait-for-port \"127.0.0.1\" 7171)
                 (conch/destroy web-server)
                 (wait/wait-for-port \"localhost\" 7172 {:default :timed-out :timeout 50})"))))
@@ -188,7 +190,7 @@
 (deftest wait-for-path-test
   (let [temp-dir-path (System/getProperty "java.io.tmpdir")]
     (is (not= :timed-out
-          (bb nil (format "(let [tdir (io/file \"%s\")
+              (bb nil (format "(let [tdir (io/file \"%s\")
                                  tfile
                                  (File/createTempFile \"wfp\" \"tmp\" tdir)
                                  tpath (.getPath tfile)]
@@ -197,16 +199,16 @@
                              (wait/wait-for-path tpath
                                {:default :timed-out :timeout 100})
                              (.delete tfile))"
-                    temp-dir-path))))
+                              temp-dir-path))))
     (is (= :timed-out
-          (bb nil (format "(let [tdir (io/file \"%s\")
+           (bb nil (format "(let [tdir (io/file \"%s\")
                                  tfile
                                  (File/createTempFile \"wfp-to\" \"tmp\" tdir)
                                  tpath (.getPath tfile)]
                              (.delete tfile) ; for timing out test and cleanup
                              (wait/wait-for-path tpath
                                {:default :timed-out :timeout 100}))"
-                    temp-dir-path))))))
+                           temp-dir-path))))))
 
 (deftest async-test
   (is (= "process 2\n" (test-utils/bb nil "
@@ -226,3 +228,65 @@
 (deftest reader-conditionals-test
   (is (= :hello (bb nil "#?(:clj (in-ns 'foo)) (println :hello)")))
   (is (= :hello (bb nil "#?(:bb :hello :default :bye)"))))
+
+(deftest csv-test
+  (is (= '(["Adult" "87727"] ["Elderly" "43914"] ["Child" "33411"] ["Adolescent" "29849"]
+           ["Infant" "15238"] ["Newborn" "10050"] ["In Utero" "1198"])
+         (bb nil (.getPath (io/file "test" "babashka" "scripts" "csv.bb"))))))
+
+(deftest assert-test ;; assert was first implemented in bb but moved to sci later
+  (is (thrown-with-msg? Exception #"should-be-true"
+                        (bb nil "(def should-be-true false) (assert should-be-true)"))))
+
+(deftest Pattern-test
+  (is (= ["1" "2" "3"]
+         (bb nil "(vec (.split (java.util.regex.Pattern/compile \"f\") \"1f2f3\"))")))
+  (is (= java.util.regex.Pattern/CANON_EQ
+         (bb nil "java.util.regex.Pattern/CANON_EQ"))))
+
+(deftest writer-test
+  (let [tmp-file (java.io.File/createTempFile "bbb" "bbb")
+        path (.getPath tmp-file)]
+    (bb nil (format "(with-open [w (io/writer \"%s\")]
+                       (.write w \"foobar\n\")
+                       (.append w \"barfoo\n\")
+                       nil)"
+                    path))
+    (is (= "foobar\nbarfoo\n" (slurp path)))))
+
+(deftest binding-test
+  (is (=  6 (bb nil "(def w (java.io.StringWriter.))
+                 (binding [clojure.core/*out* w]
+                   (println \"hello\"))
+                 (count (str w))"))))
+
+(deftest with-out-str-test
+  (is (= 6 (bb nil "(count (with-out-str (println \"hello\")))"))))
+
+(deftest with-in-str-test
+  (is (= 5 (bb nil "(count (with-in-str \"hello\" (read-line)))"))))
+
+(deftest java-nio-test
+  (let [f (java.io.File/createTempFile "foo" "bar")
+        temp-path (.getPath f)
+        p (.toPath (io/file f))
+        p' (.resolveSibling p "f2")
+        f2 (.toFile p')]
+    (bb nil (format
+             "(let [f (io/file \"%s\")
+                     p (.toPath (io/file f))
+                     p' (.resolveSibling p \"f2\")]
+                (.delete (.toFile p'))
+                (dotimes [_ 2]
+                  (try
+                    (java.nio.file.Files/copy p p' (into-array java.nio.file.CopyOption []))
+                   (catch java.nio.file.FileAlreadyExistsException _
+                     (java.nio.file.Files/copy p p' (into-array [java.nio.file.StandardCopyOption/REPLACE_EXISTING]))))))"
+             temp-path))
+    (is (.exists f2))))
+
+(deftest future-print-test
+  (testing "the root binding of sci/*out*"
+    (is (= "hello"  (bb nil "@(future (prn \"hello\"))"))))
+
+  )

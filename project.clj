@@ -11,9 +11,11 @@
   :resource-paths ["resources" "sci/resources"]
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/tools.reader "1.3.2"]
-                 [borkdude/edamame "0.0.8-alpha.4"]
+                 [borkdude/edamame "0.0.10-alpha.2"]
                  [org.clojure/core.async "0.4.500"]
-                 [org.clojure/tools.cli "0.4.2"]]
+                 [org.clojure/tools.cli "0.4.2"]
+                 [org.clojure/data.csv "0.1.4"]
+                 [cheshire "5.9.0"]]
   :profiles {:test {:dependencies [[clj-commons/conch "0.9.2"]]}
              :uberjar {:global-vars {*assert* false}
                        :jvm-opts ["-Dclojure.compiler.direct-linking=true"
