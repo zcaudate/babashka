@@ -259,7 +259,8 @@ Everything after that is bound to *command-line-args*."))
                                                                'run-state-machine-wrapped clojure.core.async.impl.ioc-macros/run-state-machine-wrapped
                                                                'aget-object clojure.core.async.impl.ioc-macros/aget-object
                                                                'aset-object clojure.core.async.impl.ioc-macros/aset-object
-                                                               'aset-all! (with-meta @#'clojure.core.async.impl.ioc-macros/aset-all! {:sci/macro true})}}
+                                                               'aset-all! (with-meta @#'clojure.core.async.impl.ioc-macros/aset-all! {:sci/macro true})
+                                                               'return-chan clojure.core.async.impl.ioc-macros/return-chan}}
              :bindings {'java.lang.System/exit exit ;; override exit, so we have more control
                         'System/exit exit}
              :env env
@@ -293,7 +294,8 @@ Everything after that is bound to *command-line-args*."))
                        'java.nio.file.StandardCopyOption java.nio.file.StandardCopyOption
                        ;; core async
                        'clojure.lang.Var clojure.lang.Var
-                       'java.util.concurrent.atomic.AtomicReferenceArray java.util.concurrent.atomic.AtomicReferenceArray}
+                       'java.util.concurrent.atomic.AtomicReferenceArray java.util.concurrent.atomic.AtomicReferenceArray
+                       'java.lang.Throwable java.lang.Throwable}
              :imports '{ArithmeticException java.lang.ArithmeticException
                         AssertionError java.lang.AssertionError
                         Boolean java.lang.Boolean

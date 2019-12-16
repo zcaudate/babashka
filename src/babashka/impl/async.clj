@@ -67,5 +67,6 @@
    'untap-all async/untap-all
    ;; go
    'go (with-meta @#'async/go {:sci/macro true})
+   '>! async/>!
    '<! async/<!})
 
