@@ -19,7 +19,7 @@
    [clojure.java.io :as io]
    [clojure.java.shell :as shell]
    [clojure.string :as str]
-   [clj-http.client :as client]
+   [clj-http.lite.client :as client]
    [sci.addons :as addons])
   (:gen-class))
 
@@ -252,7 +252,7 @@ Everything after that is bound to *command-line-args*."))
                           'clojure.core.async async-namespace
                           'clojure.data.csv csv/csv-namespace
                           'cheshire.core cheshire-core-namespace
-                          'clj-http.client {'get client/get}}
+                          'clj-http.lite.client {'get client/get}}
              :bindings {'java.lang.System/exit exit ;; override exit, so we have more control
                         'System/exit exit}
              :env env

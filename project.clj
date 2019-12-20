@@ -16,7 +16,7 @@
                  [org.clojure/tools.cli "0.4.2"]
                  [org.clojure/data.csv "0.1.4"]
                  [cheshire "5.9.0"]
-                 [clj-http "3.10.0"]]
+                 [org.martinklepsch/clj-http-lite "0.4.3"]]
   :profiles {:test {:dependencies [[clj-commons/conch "0.9.2"]]}
              :uberjar {:global-vars {*assert* false}
                        :jvm-opts ["-Dclojure.compiler.direct-linking=true"
