@@ -141,7 +141,7 @@ For more info, see:
       (do (sh java-cmd "-Xms256m" "-classpath" tools-cp
               "clojure.main" "-m" "clojure.tools.deps.alpha.script.resolve-tags"
               "--deps-file=deps.edn")
-        (System/exit 0))
+          (System/exit 0))
       (binding [*out* *err*]
         (println "deps.edn does not exist")
         (System/exit 1)))))
@@ -191,136 +191,100 @@ For more info, see:
     user-cache-dir))
 
 ;; Construct location of cached classpath file
-(def val* (format "%s|%s|%s|%s|%s"
-                  (:resolve-aliases args)
-                  (:classpath-aliases args)
-                  (:all-aliases args)
-                  (:jvm-aliases args)
-                  (:main-aliases args)
-                  #_deps-data))
+(def val*
+  (str/join "|"
+            (concat [(:resolve-aliases args)
+                     (:classpath-aliases args)
+                     (:all-aliases args)
+                     (:jvm-aliases args)
+                     (:main-aliases args)
+                     (:deps-data args)]
+                    (map (fn [config-path]
+                           (if (.exists (io/file config-path))
+                             config-path
+                             "NIL"))
+                         config-paths))))
 
-(prn val*)
+(def ck (-> (sh "cksum" :in val*)
+            :out
+            (str/split #" ")
+            first))
 
-;; val="$(join '' ${resolve_aliases[@]})|$(join '' ${classpath_aliases[@]})|$(join '' ${all_aliases[@]})|$(join '' ${jvm_aliases[@]})|$(join '' ${main_aliases[@]})|$deps_data"
-;; for config_path in "${config_paths[@]}"; do
-;; if [[ -f "$config_path" ]]; then
-;; val="$val|$config_path"
-;; else
-;; val="$val|NIL"
-;; fi
-;; done
-;; ck=$(echo "$val" | cksum | cut -d" " -f 1)
+(def libs-file (.getPath (io/file cache-dir (str ck ".libs"))))
+(def cp-file (.getPath (io/file cache-dir (str ck ".cp"))))
+(def jvm-file (.getPath (io/file cache-dir (str ck ".jvm"))))
+(def main-file (.getPath (io/file cache-dir (str ck ".main"))))
 
-;; libs_file="$cache_dir/$ck.libs"
-;; cp_file="$cache_dir/$ck.cp"
-;; jvm_file="$cache_dir/$ck.jvm"
-;; main_file="$cache_dir/$ck.main"
+(when (:verbose args)
+  (println "version      =  1.10.1.478") ;; TODO
+  (println "install_dir  =" install-dir)
+  (println "config_dir   =" config-dir)
+  (println "config_paths =" (str/join " " config-paths))
+  (println "cache_dir    =" cache-dir)
+  (println "cp_file      =" cp-file)
+  (println))
 
-;; # Print paths in verbose mode
-;; if "$verbose"; then
-;; echo "version      = ${project.version}"
-;; echo "install_dir  = $install_dir"
-;; echo "config_dir   = $config_dir"
-;; echo "config_paths =" "${config_paths[@]}"
-;; echo "cache_dir    = $cache_dir"
-;; echo "cp_file      = $cp_file"
-;; echo
-;; fi
+(def stale "true if classpath file is stale"
+  (or (:force args)
+      (:trace args)
+      (not (.exists (io/file cp-file)))
+      (let [cp-file (io/file cp-file)]
+        (some (fn [config-path]
+                (let [f (io/file config-path)]
+                  (or (not (.exists f))
+                      (> (.lastModified f)
+                         (.lastModified cp-file))))) config-paths))))
 
-;; # Check for stale classpath file
-;; stale=false
-;; if "$force" || "$trace" || [ ! -f "$cp_file" ]; then
-;; stale=true
-;; else
-;; for config_path in "${config_paths[@]}"; do
-;; if [ "$config_path" -nt "$cp_file" ]; then
-;; stale=true
-;; break
-;; fi
-;; done
-;; fi
+(def tools-args
+  (when (or stale (:pom args))
+    (cond-> []
+      (not (str/blank? (:deps-data args)))
+      (conj "--config-data" (:deps-data args))
+      (:resolve-aliases args)
+      (conj (str "-R" (:resolve-aliases args)))
+      (:classpath-aliases args)
+      (conj (str "-C" (:classpath-aliases args)))
+      (:jvm-aliases args)
+      (conj (str "-J" (:jvm-aliases args)))
+      (:main-aliases args)
+      (conj (str "-M" (:main-aliases args)))
+      (:all-aliases args)
+      (conj (str "-A" (:all-aliases args)))
+      (:force-cp args)
+      (conj "--skip-cp")
+      (:trace args)
+      (conj "--trace"))))
 
-;; # Make tools args if needed
-;; if "$stale" || "$pom"; then
-;; tools_args=()
-;; if [[ -n "$deps_data" ]]; then
-;; tools_args+=("--config-data" "$deps_data")
-;; fi
-;; if [[ ${#resolve_aliases[@]} -gt 0 ]]; then
-;; tools_args+=("-R$(join '' ${resolve_aliases[@]})")
-;; fi
-;; if [[ ${#classpath_aliases[@]} -gt 0 ]]; then
-;; tools_args+=("-C$(join '' ${classpath_aliases[@]})")
-;; fi
-;; if [[ ${#jvm_aliases[@]} -gt 0 ]]; then
-;; tools_args+=("-J$(join '' ${jvm_aliases[@]})")
-;; fi
-;; if [[ ${#main_aliases[@]} -gt 0 ]]; then
-;; tools_args+=("-M$(join '' ${main_aliases[@]})")
-;; fi
-;; if [[ ${#all_aliases[@]} -gt 0 ]]; then
-;; tools_args+=("-A$(join '' ${all_aliases[@]})")
-;; fi
-;; if [[ -n "$force_cp" ]]; then
-;; tools_args+=("--skip-cp")
-;; fi
-;; if "$trace"; then
-;; tools_args+=("--trace")
-;; fi
-;; fi
-
-;; # If stale, run make-classpath to refresh cached classpath
-;; if [[ "$stale" = true && "$describe" = false ]]; then
-;; if "$verbose"; then
-;; echo "Refreshing classpath"
-;; fi
-
-(def config-project "deps.edn")
-
-;; TODO:
-(def val* "123123")
-(def ck (:out (sh "cksum" :in val*)))
-
-(def cache-dir (io/file ".cpcache"))
-(def libs-file (io/file cache-dir (str ck ".libs")))
-(def cp-file (io/file cache-dir (str ck ".cp")))
-(def jvm-file (io/file cache-dir (str ck ".jvm")))
-(def main-file (io/file cache-dir (str ck ".main")))
-
-(def stale
-  (let [deps-edn-file (io/file config-project)]
-    (or (not (.exists cp-file))
-        (> (.lastModified deps-edn-file)
-           (.lastModified cp-file)))))
-
-(when stale
+;;  If stale, run make-classpath to refresh cached classpath
+(when (and stale (not (:describe args)))
   (sh java-cmd "-Xms256m"
-         "-classpath" tools-cp
-         "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
-         ;; "--config-user" ""
-         "--config-project" config-project
-         "--libs-file" (str libs-file)
-         "--cp-file" (str cp-file)
-         "--jvm-file" (str jvm-file)
-         "--main-file" (str main-file)))
+      "-classpath" tools-cp
+      "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
+      "--config-user" config-user
+      "--config-project" config-project
+      "--libs-file" libs-file
+      "--cp-file" cp-file
+      "--jvm-file" jvm-file
+      "--main-file" main-file))
 
-(println (slurp cp-file))
+(def cp
+  (cond (:describe args) nil
+        (not (str/blank? (:force-cp args))) (:force-cp args)
+        :else (slurp cp-file)))
 
-;; "$JAVA_CMD" -Xms256m -classpath "$tools_cp" clojure.main -m clojure.tools.deps.alpha.script.make-classpath2 --config-user "$config_user" --config-project "$config_project" --libs-file "$libs_file" --cp-file "$cp_file" --jvm-file "$jvm_file" --main-file "$main_file" "${tools_args[@]}"
-;; fi
+(cond (:pom args)
+      (sh java-cmd "-Xms256m"
+          "-classpath" tools-cp
+          "clojure.main" "-m" "clojure.tools.deps.alpha.script.generate-manifest2"
+          "--config-user" config-user
+          "--config-project" config-project
+          "--gen=pom" (str/join " " tools-args))
+      (:print-classpath args)
+      (println cp)
+      (:describe args)
+      ::TODO
+      )
 
-;; if "$describe"; then
-;; cp=
-;; elif [[ -n "$force_cp" ]]; then
-;; cp="$force_cp"
-;; else
-;; cp=$(cat "$cp_file")
-;; fi
-
-;; if "$pom"; then
-;; exec "$JAVA_CMD" -Xms256m -classpath "$tools_cp" clojure.main -m clojure.tools.deps.alpha.script.generate-manifest2 --config-user "$config_user" --config-project "$config_project" --gen=pom "${tools_args[@]}"
-;; elif "$print_classpath"; then
-;; echo "$cp"
 ;; elif "$describe"; then
 ;; for config_path in "${config_paths[@]}"; do
 ;; if [[ -f "$config_path" ]]; then
