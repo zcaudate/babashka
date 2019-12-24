@@ -1,52 +1,111 @@
 #!/usr/bin/env bb
 
-;; # Version = ${project.version}
-
-;; # set -e
+(require '[clojure.string :as str]
+         '[clojure.java.io :as io]
+         '[clojure.java.shell :as sh])
 
 ;; # function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
-;; # Extract opts
-(def print_classpath false)
-(def describe false)
-(def verbose false)
-(def trace false)
-(def force* (atom false))
-(def repro (atom false))
-(def tree (atom false))
-(def pom (atom false))
-(def resolve_tags (atom false))
-(def help (atom false))
-(def jvm_opts (atom []))
-(def resolve_aliases (atom []))
-(def classpath_aliases (atom []))
-(def jvm_aliases (atom []))
-(def main_aliases (atom []))
-(def all_aliases (atom []))
+(def help-text (str/trim "
+Usage: clojure [dep-opt*] [init-opt*] [main-opt] [arg*]
+       clj     [dep-opt*] [init-opt*] [main-opt] [arg*]
 
-(require '[clojure.string :as str])
+The clojure script is a runner for Clojure. clj is a wrapper
+for interactive repl use. These scripts ultimately construct and
+invoke a command-line of the form:
 
-(defn parse-command-line-args []
-  (reduce (fn [acc arg]
-            (cond (str/starts-with? arg "-J") (update acc :jvm-opts conj arg)
-                  (str/starts-with? arg "-R") (update acc :resolve-aliases conj arg)
-                  (str/starts-with? arg "-C") (update acc :classpath-aliases conj arg)
-                  (str/starts-with? arg "-O") (update acc :jvm-aliases conj arg)
-                  (str/starts-with? arg "-M") (update acc :main-aliases conj arg)
-                  (str/starts-with? arg "-A") (update acc :all-aliases conj arg)
-                  (= "-Sdeps" arg) (assoc acc :deps-data arg)
-                  (= "-Scp" arg) (assoc acc :force-cp arg)
-                  (= "-Spath" arg) (assoc acc :print-classpath arg)
-                  ;; TODO: rest
-                  :else acc))
-          {:jvm-opts []}
-          *command-line-args*))
+java [java-opt*] -cp classpath clojure.main [init-opt*] [main-opt] [arg*]
 
-;; (prn (parse-command-line-args))
+The dep-opts are used to build the java-opts and classpath:
+ -Jopt          Pass opt through in java_opts, ex: -J-Xmx512m
+ -Oalias...     Concatenated jvm option aliases, ex: -O:mem
+ -Ralias...     Concatenated resolve-deps aliases, ex: -R:bench:1.9
+ -Calias...     Concatenated make-classpath aliases, ex: -C:dev
+ -Malias...     Concatenated main option aliases, ex: -M:test
+ -Aalias...     Concatenated aliases of any kind, ex: -A:dev:mem
+ -Sdeps EDN     Deps data to use as the last deps file to be merged
+ -Spath         Compute classpath and echo to stdout only
+ -Scp CP        Do NOT compute or cache classpath, use this one instead
+ -Srepro        Ignore the ~/.clojure/deps.edn config file
+ -Sforce        Force recomputation of the classpath (don't use the cache)
+ -Spom          Generate (or update existing) pom.xml with deps and paths
+ -Stree         Print dependency tree
+ -Sresolve-tags Resolve git coordinate tags to shas and update deps.edn
+ -Sverbose      Print important path info to console
+ -Sdescribe     Print environment and command parsing info as data
+ -Strace        Write a trace.edn file that traces deps expansion
 
-(require '[clojure.java.shell :as sh])
+init-opt:
+ -i, --init path     Load a file or resource
+ -e, --eval string   Eval exprs in string; print non-nil values
+ --report target     Report uncaught exception to \"file\" (default), \"stderr\", or \"none\",
+                     overrides System property clojure.main.report
 
-(def java-cmd
+main-opt:
+ -m, --main ns-name  Call the -main function from namespace w/args
+ -r, --repl          Run a repl
+ path                Run a script from a file or resource
+ -                   Run a script from standard input
+ -h, -?, --help      Print this help message and exit
+
+For more info, see:
+ https://clojure.org/guides/deps_and_cli
+ https://clojure.org/reference/repl_and_main
+"))
+
+(def parse-opts->keyword
+  {"-J" :jvm-opts
+   "-R" :resolve-aliases
+   "-C" :classpath-aliases
+   "-O" :jvm-aliases
+   "-M" :main-aliases
+   "-A" :all-aliases})
+
+(def bool-opts->keyword
+  {"-Spath" :print-classpath
+   "-Sverbose" :verbose
+   "-Strace" :trace
+   "-Sdescribe" :describe
+   "-Sforce" :force
+   "-Srepro" :repro
+   "-Stree" :tree
+   "-Spom" :pom
+   "-Sresolve-tags" :resolve-tags})
+
+(def args "the parsed arguments"
+  (loop [command-line-args *command-line-args*
+         acc {}]
+    (if command-line-args
+      (let [arg (first command-line-args)
+            bool-keyword (get bool-opts->keyword arg)]
+        (cond (some #(str/starts-with? arg %) ["-J" "-R" "-C" "-O" "-M" "-A"])
+              (recur (next command-line-args)
+                     (update acc (get parse-opts->keyword (subs arg 0 2))
+                             str (subs arg 2)))
+              bool-keyword (recur
+                            (next command-line-args)
+                            (assoc acc bool-keyword true))
+              (= "-Sdeps" arg) (recur
+                                (nnext command-line-args)
+                                (assoc acc :deps-data (second command-line-args)))
+              (= "-Scp" arg) (recur
+                              (nnext command-line-args)
+                              (assoc acc :force-cp (second command-line-args)))
+              (str/starts-with? arg "-S") (binding [*out* *err*]
+                                            (println "Invalid option:" arg)
+                                            (System/exit 1))
+              (and
+               (not (some acc [:main-aliases :all-aliases]))
+               (or (= "-h" arg)
+                   (= "--help" arg))) (assoc acc :help true)
+              :else acc))
+      acc)))
+
+(when (:help args)
+  (println help-text)
+  (System/exit 0))
+
+(def java-cmd "the java executable"
   (let [java-cmd (str/trim (:out (sh/sh "type" "-p" "java")))]
     (if (str/blank? java-cmd)
       (let [java-home (System/getenv "JAVA_HOME")]
@@ -67,141 +126,24 @@
         parent (.getParent (io/file parent))]
     parent))
 
-(def tools-cp (let [files (.listFiles (io/file install-dir "libexec"))
-                    jar (some #(let [name (.getName %)]
-                                 (when (and (str/starts-with? name "clojure-tools")
-                                            (str/ends-with? name ".jar"))
-                                   %))
-                              files)]
-                (.getCanonicalPath jar)))
+(def tools-cp
+  (let [files (.listFiles (io/file install-dir "libexec"))
+        jar (some #(let [name (.getName %)]
+                     (when (and (str/starts-with? name "clojure-tools")
+                                (str/ends-with? name ".jar"))
+                       %))
+                  files)]
+    (.getCanonicalPath jar)))
+
+(when (:resolve-tags args)
+  ;; TODO
+  (System/exit 0))
+
+;; 186
 
 ;; (println tools-cp)
 
 ;; TODO help
-
-;; while [ $# -gt 0 ]
-;; do
-;;   case "$1" in
-
-
-;;     -A*)
-;;       all_aliases+=("${1:2}")
-;;       shift
-;;       ;;
-;;     -Sdeps)
-;;       shift
-;;       deps_data="${1}"
-;;       shift
-;;       ;;
-;;     -Scp)
-;;       shift
-;;       force_cp="${1}"
-;;       shift
-;;       ;;
-;;     -Spath)
-;;       print_classpath=true
-;;       shift
-;;       ;;
-;;     -Sverbose)
-;;       verbose=true
-;;       shift
-;;       ;;
-;;     -Strace)
-;;       trace=true
-;;       shift
-;;       ;;
-;;     -Sdescribe)
-;;       describe=true
-;;       shift
-;;       ;;
-;;     -Sforce)
-;;       force=true
-;;       shift
-;;       ;;
-;;     -Srepro)
-;;       repro=true
-;;       shift
-;;       ;;
-;;     -Stree)
-;;       tree=true
-;;       shift
-;;       ;;
-;;     -Spom)
-;;       pom=true
-;;       shift
-;;       ;;
-;;     -Sresolve-tags)
-;;       resolve_tags=true
-;;       shift
-;;       ;;
-;;     -S*)
-;;       echo "Invalid option: $1"
-;;       exit 1
-;;       ;;
-;;     -h|--help|"-?")
-;;       if [[ ${#main_aliases[@]} -gt 0 ]] || [[ ${#all_aliases[@]} -gt 0 ]]; then
-;;         break
-;;       else
-;;         help=true
-;;         shift
-;;       fi
-;;       ;;
-;;     *)
-;;       break
-;;       ;;
-;;   esac
-;; done
-
-;; if "$help"; then
-;;   cat <<-END
-;;      Usage: clojure [dep-opt*] [init-opt*] [main-opt] [arg*]
-;;             clj     [dep-opt*] [init-opt*] [main-opt] [arg*]
-
-;;      The clojure script is a runner for Clojure. clj is a wrapper
-;;      for interactive repl use. These scripts ultimately construct and
-;;      invoke a command-line of the form:
-
-;;      java [java-opt*] -cp classpath clojure.main [init-opt*] [main-opt] [arg*]
-
-;;      The dep-opts are used to build the java-opts and classpath:
-;;       -Jopt          Pass opt through in java_opts, ex: -J-Xmx512m
-;;       -Oalias...     Concatenated jvm option aliases, ex: -O:mem
-;;       -Ralias...     Concatenated resolve-deps aliases, ex: -R:bench:1.9
-;;       -Calias...     Concatenated make-classpath aliases, ex: -C:dev
-;;       -Malias...     Concatenated main option aliases, ex: -M:test
-;;       -Aalias...     Concatenated aliases of any kind, ex: -A:dev:mem
-;;       -Sdeps EDN     Deps data to use as the last deps file to be merged
-;;       -Spath         Compute classpath and echo to stdout only
-;;       -Scp CP        Do NOT compute or cache classpath, use this one instead
-;;       -Srepro        Ignore the ~/.clojure/deps.edn config file
-;;       -Sforce        Force recomputation of the classpath (don't use the cache)
-;;       -Spom          Generate (or update existing) pom.xml with deps and paths
-;;       -Stree         Print dependency tree
-;;       -Sresolve-tags Resolve git coordinate tags to shas and update deps.edn
-;;       -Sverbose      Print important path info to console
-;;       -Sdescribe     Print environment and command parsing info as data
-;;       -Strace        Write a trace.edn file that traces deps expansion
-
-;;      init-opt:
-;;       -i, --init path     Load a file or resource
-;;       -e, --eval string   Eval exprs in string; print non-nil values
-;;       --report target     Report uncaught exception to "file" (default), "stderr", or "none",
-;;                           overrides System property clojure.main.report
-
-;;      main-opt:
-;;       -m, --main ns-name  Call the -main function from namespace w/args
-;;       -r, --repl          Run a repl
-;;       path                Run a script from a file or resource
-;;       -                   Run a script from standard input
-;;       -h, -?, --help      Print this help message and exit
-
-;;      For more info, see:
-;;       https://clojure.org/guides/deps_and_cli
-;;       https://clojure.org/reference/repl_and_main
-;; END
-;;   exit 0
-;; fi
-
 
 ;; # Execute resolve-tags command
 ;; if "$resolve_tags"; then
