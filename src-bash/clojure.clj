@@ -4,8 +4,6 @@
          '[clojure.java.io :as io]
          '[clojure.java.shell :refer [sh]])
 
-;; # function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
-
 (def help-text (str/trim "
 Usage: clojure [dep-opt*] [init-opt*] [main-opt] [arg*]
        clj     [dep-opt*] [init-opt*] [main-opt] [arg*]
