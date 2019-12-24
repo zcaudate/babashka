@@ -2,7 +2,7 @@
 
 (require '[clojure.string :as str]
          '[clojure.java.io :as io]
-         '[clojure.java.shell :as sh])
+         '[clojure.java.shell :refer [sh]])
 
 ;; # function join { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
@@ -73,7 +73,7 @@ For more info, see:
    "-Sresolve-tags" :resolve-tags})
 
 (def args "the parsed arguments"
-  (loop [command-line-args *command-line-args*
+  (loop [command-line-args (seq *command-line-args*)
          acc {}]
     (if command-line-args
       (let [arg (first command-line-args)
@@ -106,7 +106,7 @@ For more info, see:
   (System/exit 0))
 
 (def java-cmd "the java executable"
-  (let [java-cmd (str/trim (:out (sh/sh "type" "-p" "java")))]
+  (let [java-cmd (str/trim (:out (sh "type" "-p" "java")))]
     (if (str/blank? java-cmd)
       (let [java-home (System/getenv "JAVA_HOME")]
         (if-not (str/blank? java-home)
@@ -119,7 +119,7 @@ For more info, see:
       java-cmd)))
 
 (def install-dir
-  (let [clojure-on-path (str/trim (:out (sh/sh "type" "-p" "clojure")))
+  (let [clojure-on-path (str/trim (:out (sh "type" "-p" "clojure")))
         f (io/file clojure-on-path)
         f (io/file (.getCanonicalPath f))
         parent (.getParent f)
@@ -136,71 +136,71 @@ For more info, see:
     (.getCanonicalPath jar)))
 
 (when (:resolve-tags args)
-  ;; TODO
-  (System/exit 0))
+  (let [f (io/file "deps.edn")]
+    (if (.exists f)
+      (do (sh java-cmd "-Xms256m" "-classpath" tools-cp
+              "clojure.main" "-m" "clojure.tools.deps.alpha.script.resolve-tags"
+              "--deps-file=deps.edn")
+        (System/exit 0))
+      (binding [*out* *err*]
+        (println "deps.edn does not exist")
+        (System/exit 1)))))
 
-;; 186
+(def config-dir
+  (or (System/getenv "CLJ_CONFIG")
+      (when-let [xdg-config-home (System/getenv "XDG_CONFIG_HOME")]
+        (.getPath (io/file xdg-config-home "clojure")))
+      (.getPath (io/file (System/getProperty "user.home") ".clojure"))))
 
-;; (println tools-cp)
+;; If user config directory does not exist, create it
+(when-not (.exists (io/file config-dir))
+  (.mkdirs config-dir))
 
-;; TODO help
+(let [config-deps-edn (io/file config-dir "deps.edn")]
+  (when-not (.exists config-deps-edn)
+    (io/copy (io/file install-dir "example-deps.edn")
+             config-deps-edn)))
 
-;; # Execute resolve-tags command
-;; if "$resolve_tags"; then
-;; if [[ -e deps.edn ]]; then
-;; "$JAVA_CMD" -Xms256m -classpath "$tools_cp" clojure.main -m clojure.tools.deps.alpha.script.resolve-tags "--deps-file=deps.edn"
-;; exit 0
-;; else
-;; echo "deps.edn does not exist"
-;; exit 1
-;; fi
-;; fi
+;; Determine user cache directory
+(def user-cache-dir
+  (or (System/getenv "CLJ_CACHE")
+      (when-let [xdg-config-home (System/getenv "XDG_CACHE_HOME")]
+        (.getPath (io/file xdg-config-home "clojure")))
+      (.getPath (io/file config-dir ".cpcache"))))
 
-;; # Determine user config directory
-;; if [[ -n "$CLJ_CONFIG" ]]; then
-;; config_dir="$CLJ_CONFIG"
-;; elif [[ -n "$XDG_CONFIG_HOME" ]]; then
-;; config_dir="$XDG_CONFIG_HOME/clojure"
-;; else
-;; config_dir="$HOME/.clojure"
-;; fi
+;; Chain deps.edn in config paths. repro=skip config dir
+(def config-user
+  (when-not (:repro args)
+    (.getPath (io/file config-dir "deps.edn"))))
 
-;; # If user config directory does not exist, create it
-;; if [[ ! -d "$config_dir" ]]; then
-;; mkdir -p "$config_dir"
-;; fi
-;; if [[ ! -e "$config_dir/deps.edn" ]]; then
-;; cp "$install_dir/example-deps.edn" "$config_dir/deps.edn"
-;; fi
+(def config-project "deps.edn")
+(def config-paths
+  (if (:repro args)
+    ;; TODO: we could come up with a setting that also ignores the install-dir for babashka
+    [(.getPath (io/file install-dir "deps.edn")) "deps.edn"]
+    [(.getPath (io/file install-dir "deps.edn"))
+     (.getPath (io/file config-dir "deps.edn"))
+     "deps.edn"]))
 
-;; # Determine user cache directory
-;; if [[ -n "$CLJ_CACHE" ]]; then
-;; user_cache_dir="$CLJ_CACHE"
-;; elif [[ -n "$XDG_CACHE_HOME" ]]; then
-;; user_cache_dir="$XDG_CACHE_HOME/clojure"
-;; else
-;; user_cache_dir="$config_dir/.cpcache"
-;; fi
+(def config-str (str/join "," config-paths))
 
-;; # Chain deps.edn in config paths. repro=skip config dir
-;; config_project="deps.edn"
-;; if "$repro"; then
-;; config_paths=("$install_dir/deps.edn" "deps.edn")
-;; else
-;; config_user="$config_dir/deps.edn"
-;; config_paths=("$install_dir/deps.edn" "$config_dir/deps.edn" "deps.edn")
-;; fi
-;; config_str=$(printf ",%s" "${config_paths[@]}")
-;; config_str=${config_str:1}
+;; Determine whether to use user or project cache
+(def cache-dir
+  (if (.exists (io/file "deps.edn"))
+    ".cpcache"
+    user-cache-dir))
 
-;; # Determine whether to use user or project cache
-;; if [[ -f deps.edn ]]; then
-;; cache_dir=.cpcache
-;; else
-;; cache_dir="$user_cache_dir"
-;; fi
+;; Construct location of cached classpath file
+(def val* (format "%s|%s|%s|%s|%s"
+                  (:resolve-aliases args)
+                  (:classpath-aliases args)
+                  (:all-aliases args)
+                  (:jvm-aliases args)
+                  (:main-aliases args)
+                  #_deps-data))
 
-;; # Construct location of cached classpath file
+(prn val*)
+
 ;; val="$(join '' ${resolve_aliases[@]})|$(join '' ${classpath_aliases[@]})|$(join '' ${all_aliases[@]})|$(join '' ${jvm_aliases[@]})|$(join '' ${main_aliases[@]})|$deps_data"
 ;; for config_path in "${config_paths[@]}"; do
 ;; if [[ -f "$config_path" ]]; then
@@ -279,7 +279,7 @@ For more info, see:
 
 ;; TODO:
 (def val* "123123")
-(def ck (:out (sh/sh "cksum" :in val*)))
+(def ck (:out (sh "cksum" :in val*)))
 
 (def cache-dir (io/file ".cpcache"))
 (def libs-file (io/file cache-dir (str ck ".libs")))
@@ -294,7 +294,7 @@ For more info, see:
            (.lastModified cp-file)))))
 
 (when stale
-  (sh/sh java-cmd "-Xms256m"
+  (sh java-cmd "-Xms256m"
          "-classpath" tools-cp
          "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
          ;; "--config-user" ""
