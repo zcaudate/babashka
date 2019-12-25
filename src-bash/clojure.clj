@@ -4,6 +4,8 @@
          '[clojure.java.io :as io]
          '[clojure.java.shell :refer [sh]])
 
+(def project-version "0.0.1")
+
 (def help-text (str/trim "
 Usage: clojure [dep-opt*] [init-opt*] [main-opt] [arg*]
        clj     [dep-opt*] [init-opt*] [main-opt] [arg*]
@@ -214,7 +216,7 @@ For more info, see:
 (def main-file (.getPath (io/file cache-dir (str ck ".main"))))
 
 (when (:verbose args)
-  (println "version      =  1.10.1.478") ;; TODO
+  (println "version      =" project-version)
   (println "install_dir  =" install-dir)
   (println "config_dir   =" config-dir)
   (println "config_paths =" (str/join " " config-paths))
@@ -255,20 +257,33 @@ For more info, see:
 
 ;;  If stale, run make-classpath to refresh cached classpath
 (when (and stale (not (:describe args)))
-  (sh java-cmd "-Xms256m"
-      "-classpath" tools-cp
-      "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
-      "--config-user" config-user
-      "--config-project" config-project
-      "--libs-file" libs-file
-      "--cp-file" cp-file
-      "--jvm-file" jvm-file
-      "--main-file" main-file))
+  (when (:verbose args)
+    (println "Refreshing classpath"))
+  (apply sh java-cmd "-Xms256m"
+         "-classpath" tools-cp
+         "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
+         "--config-user" config-user
+         "--config-project" config-project
+         "--libs-file" libs-file
+         "--cp-file" cp-file
+         "--jvm-file" jvm-file
+         "--main-file" main-file
+         tools-args))
 
 (def cp
   (cond (:describe args) nil
         (not (str/blank? (:force-cp args))) (:force-cp args)
         :else (slurp cp-file)))
+
+(defn describe-line [[kw val]]
+  (pr kw val ))
+
+(defn describe [lines]
+  (let [[first-line & lines] lines]
+    (print "{") (describe-line first-line)
+    (doseq [line lines]
+      (print "\n ") (describe-line line))
+    (println "}")))
 
 (cond (:pom args)
       (sh java-cmd "-Xms256m"
@@ -280,42 +295,29 @@ For more info, see:
       (:print-classpath args)
       (println cp)
       (:describe args)
-      ::TODO
-      )
-
-;; elif "$describe"; then
-;; for config_path in "${config_paths[@]}"; do
-;; if [[ -f "$config_path" ]]; then
-;; path_vector="$path_vector\"$config_path\" "
-;; fi
-;; done
-;; cat <<-END
-;; {:version "${project.version}"
-;;  :config-files [$path_vector]
-;;  :config-user "$config_user"
-;;  :config-project "$config_project"
-;;  :install-dir "$install_dir"
-;;  :config-dir "$config_dir"
-;;  :cache-dir "$cache_dir"
-;;  :force $force
-;;  :repro $repro
-;;  :resolve-aliases "$(join '' ${resolve_aliases[@]})"
-;;  :classpath-aliases "$(join '' ${classpath_aliases[@]})"
-;;  :jvm-aliases "$(join '' ${jvm_aliases[@]})"
-;;  :main-aliases "$(join '' ${main_aliases[@]})"
-;;  :all-aliases "$(join '' ${all_aliases[@]})"}
-;; END
-;; elif "$tree"; then
-;; exec "$JAVA_CMD" -Xms256m -classpath "$tools_cp" clojure.main -m clojure.tools.deps.alpha.script.print-tree --libs-file "$libs_file"
-;; elif "$trace"; then
-;; echo "Writing trace.edn"
-;; else
-;; set -f
-;; if [[ -e "$jvm_file" ]]; then
-;; jvm_cache_opts=($(cat "$jvm_file"))
-;; fi
-;; if [[ -e "$main_file" ]]; then
-;; main_cache_opts=($(cat "$main_file"))
-;; fi
-;; exec "$JAVA_CMD" "${jvm_cache_opts[@]}" "${jvm_opts[@]}" "-Dclojure.libfile=$libs_file" -classpath "$cp" clojure.main "${main_cache_opts[@]}" "$@"
-;; fi
+      (describe [[:version project-version]
+                 [:config-files (filterv #(.exists (io/file %)) config-paths)]
+                 [:config-user config-user]
+                 [:config-project config-project]
+                 [:install-dir install-dir]
+                 [:cache-dir cache-dir]
+                 [:force (str (:force args))]
+                 [:repro (str (:repro args))]
+                 [:resolve-aliases (str (:resolve-aliases args))]
+                 [:classpath-aliases (str (:claspath-aliases args))]
+                 [:jvm-aliases (str (:jvm-aliases args))]
+                 [:main-aliases (str (:main-aliases args))]
+                 [:all-aliases (str (:all-aliases args))]])
+      (:tree args)
+      (println (str/trim (:out (sh java-cmd "-Xms256m"
+                                   "-classpath" tools-cp
+                                   "clojure.main" "-m" "clojure.tools.deps.alpha.script.print-tree"
+                                   "--libs-file" libs-file))))
+      (:trace args)
+      (println "Writing trace.edn")
+      :else
+      (let [jvm-cache-opts (when (.exists (io/file jvm-file))
+                             (slurp jvm-file))
+            main-cache-opts (when (.exists (io/file main-file))
+                              (slurp main-file))]
+        (println (apply sh java-cmd jvm-cache-opts (:jvm-opts args) (str "-Dclojure.libfile=" libs-file) "--classpath" cp "clojure.main" main-cache-opts *command-line-args*))))

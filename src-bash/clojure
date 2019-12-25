@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Version = ${project.version}
+# Version = 1.10.1.492
 
 set -e
 
@@ -178,12 +178,8 @@ END
 fi
 
 # Set dir containing the installed files
-# install_dir=PREFIX
-# tools_cp="$install_dir/libexec/clojure-tools-${project.version}.jar"
-
-install_dir=/usr/local/Cellar/clojure/1.10.1.478
-tools_cp="$install_dir/libexec/clojure-tools-1.10.1.478.jar"
-
+install_dir=/usr/local/Cellar/clojure/1.10.1.492
+tools_cp="$install_dir/libexec/clojure-tools-1.10.1.492.jar"
 
 # Execute resolve-tags command
 if "$resolve_tags"; then
@@ -242,7 +238,6 @@ fi
 
 # Construct location of cached classpath file
 val="$(join '' ${resolve_aliases[@]})|$(join '' ${classpath_aliases[@]})|$(join '' ${all_aliases[@]})|$(join '' ${jvm_aliases[@]})|$(join '' ${main_aliases[@]})|$deps_data"
-echo "VAL $val"
 for config_path in "${config_paths[@]}"; do
   if [[ -f "$config_path" ]]; then
     val="$val|$config_path"
@@ -259,7 +254,7 @@ main_file="$cache_dir/$ck.main"
 
 # Print paths in verbose mode
 if "$verbose"; then
-  echo "version      = ${project.version}"
+  echo "version      = 1.10.1.492"
   echo "install_dir  = $install_dir"
   echo "config_dir   = $config_dir"
   echo "config_paths =" "${config_paths[@]}"
@@ -338,7 +333,7 @@ elif "$describe"; then
     fi
   done
   cat <<-END
-	{:version "${project.version}"
+	{:version "1.10.1.492"
 	 :config-files [$path_vector]
 	 :config-user "$config_user"
 	 :config-project "$config_project"
@@ -365,5 +360,6 @@ else
   if [[ -e "$main_file" ]]; then
     main_cache_opts=($(cat "$main_file"))
   fi
+  echo "OPTS $jvm_cache_opts $main_file $main_cache_opts"
   exec "$JAVA_CMD" "${jvm_cache_opts[@]}" "${jvm_opts[@]}" "-Dclojure.libfile=$libs_file" -classpath "$cp" clojure.main "${main_cache_opts[@]}" "$@"
 fi
