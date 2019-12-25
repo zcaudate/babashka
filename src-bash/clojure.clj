@@ -1,10 +1,43 @@
-#!/usr/bin/env bb
+#!/usr/bin/env bb --verbose
 
 (require '[clojure.string :as str]
-         '[clojure.java.io :as io]
-         '[clojure.java.shell :refer [sh]])
+         '[clojure.java.io :as io])
 
-(def project-version "0.0.1")
+(import '[java.lang ProcessBuilder$Redirect])
+
+(defn shell-command
+  "Executes shell command. Exits script when the shell-command has a non-zero exit code, propagating it.
+
+  Accepts the following options:
+
+  `:input`: instead of reading from stdin, read from this string.
+  `:to-string?`: instead of writing to stdoud, write to a string and
+  return it."
+  ([args] (shell-command args nil))
+  ([args {:keys [:input :to-string?]}]
+   (let [args (mapv str args)
+         pb (cond-> (-> (ProcessBuilder. args)
+                        (.redirectError ProcessBuilder$Redirect/INHERIT))
+              (not to-string?) (.redirectOutput ProcessBuilder$Redirect/INHERIT)
+              (not input) (.redirectInput ProcessBuilder$Redirect/INHERIT))
+         proc (.start pb)]
+     (when input
+       (with-open [w (io/writer (.getOutputStream proc))]
+         (binding [*out* w]
+           (print input)
+           (flush))))
+     (let [string-out
+           (when to-string?
+             (let [sw (java.io.StringWriter.)]
+               (with-open [w (io/reader (.getInputStream proc))]
+                 (io/copy w sw))
+               (str sw)))
+           exit-code (.waitFor proc)]
+       (when-not (zero? exit-code)
+         (System/exit exit-code))
+       string-out))))
+
+(def project-version "0.0.1-SNAPSHOT")
 
 (def help-text (str/trim "
 Usage: clojure [dep-opt*] [init-opt*] [main-opt] [arg*]
@@ -34,6 +67,10 @@ The dep-opts are used to build the java-opts and classpath:
  -Sverbose      Print important path info to console
  -Sdescribe     Print environment and command parsing info as data
  -Strace        Write a trace.edn file that traces deps expansion
+
+The following non-standard options are added:
+
+  -Sdeps-file   Use this file instead of deps.edn
 
 init-opt:
  -i, --init path     Load a file or resource
@@ -72,25 +109,29 @@ For more info, see:
    "-Spom" :pom
    "-Sresolve-tags" :resolve-tags})
 
+(def string-opts->keyword
+  {"-Sdeps" :deps-data
+   "-Scp" :force-cp
+   "-Sdeps-file" :deps-file})
+
 (def args "the parsed arguments"
   (loop [command-line-args (seq *command-line-args*)
          acc {}]
     (if command-line-args
       (let [arg (first command-line-args)
-            bool-keyword (get bool-opts->keyword arg)]
+            bool-opt-keyword (get bool-opts->keyword arg)
+            string-opt-keyword (get string-opts->keyword arg)]
         (cond (some #(str/starts-with? arg %) ["-J" "-R" "-C" "-O" "-M" "-A"])
               (recur (next command-line-args)
                      (update acc (get parse-opts->keyword (subs arg 0 2))
                              str (subs arg 2)))
-              bool-keyword (recur
+              bool-opt-keyword (recur
                             (next command-line-args)
-                            (assoc acc bool-keyword true))
-              (= "-Sdeps" arg) (recur
-                                (nnext command-line-args)
-                                (assoc acc :deps-data (second command-line-args)))
-              (= "-Scp" arg) (recur
-                              (nnext command-line-args)
-                              (assoc acc :force-cp (second command-line-args)))
+                            (assoc acc bool-opt-keyword true))
+              string-opt-keyword (recur
+                                  (nnext command-line-args)
+                                  (assoc acc string-opt-keyword
+                                         (second command-line-args)))
               (str/starts-with? arg "-S") (binding [*out* *err*]
                                             (println "Invalid option:" arg)
                                             (System/exit 1))
@@ -98,7 +139,7 @@ For more info, see:
                (not (some acc [:main-aliases :all-aliases]))
                (or (= "-h" arg)
                    (= "--help" arg))) (assoc acc :help true)
-              :else acc))
+              :else (assoc acc :args command-line-args)))
       acc)))
 
 (when (:help args)
@@ -106,7 +147,7 @@ For more info, see:
   (System/exit 0))
 
 (def java-cmd "the java executable"
-  (let [java-cmd (str/trim (:out (sh "type" "-p" "java")))]
+  (let [java-cmd (str/trim (shell-command ["type" "-p" "java"] {:to-string? true}))]
     (if (str/blank? java-cmd)
       (let [java-home (System/getenv "JAVA_HOME")]
         (if-not (str/blank? java-home)
@@ -119,7 +160,7 @@ For more info, see:
       java-cmd)))
 
 (def install-dir
-  (let [clojure-on-path (str/trim (:out (sh "type" "-p" "clojure")))
+  (let [clojure-on-path (str/trim (shell-command ["type" "-p" "clojure"] {:to-string? true}))
         f (io/file clojure-on-path)
         f (io/file (.getCanonicalPath f))
         parent (.getParent f)
@@ -135,12 +176,15 @@ For more info, see:
                   files)]
     (.getCanonicalPath jar)))
 
+(def deps-edn (or (:deps-file args)
+                  "deps.edn"))
+
 (when (:resolve-tags args)
-  (let [f (io/file "deps.edn")]
+  (let [f (io/file deps-edn)]
     (if (.exists f)
-      (do (sh java-cmd "-Xms256m" "-classpath" tools-cp
-              "clojure.main" "-m" "clojure.tools.deps.alpha.script.resolve-tags"
-              "--deps-file=deps.edn")
+      (do (shell-command [java-cmd "-Xms256m" "-classpath" tools-cp
+                          "clojure.main" "-m" "clojure.tools.deps.alpha.script.resolve-tags"
+                          "--deps-file=deps.edn"])
           (System/exit 0))
       (binding [*out* *err*]
         (println "deps.edn does not exist")
@@ -173,14 +217,14 @@ For more info, see:
   (when-not (:repro args)
     (.getPath (io/file config-dir "deps.edn"))))
 
-(def config-project "deps.edn")
+(def config-project deps-edn)
 (def config-paths
   (if (:repro args)
     ;; TODO: we could come up with a setting that also ignores the install-dir for babashka
     [(.getPath (io/file install-dir "deps.edn")) "deps.edn"]
     [(.getPath (io/file install-dir "deps.edn"))
      (.getPath (io/file config-dir "deps.edn"))
-     "deps.edn"]))
+     deps-edn]))
 
 (def config-str (str/join "," config-paths))
 
@@ -205,8 +249,8 @@ For more info, see:
                              "NIL"))
                          config-paths))))
 
-(def ck (-> (sh "cksum" :in val*)
-            :out
+(def ck (-> (shell-command ["cksum"] {:input val*
+                                      :to-string? true})
             (str/split #" ")
             first))
 
@@ -259,16 +303,16 @@ For more info, see:
 (when (and stale (not (:describe args)))
   (when (:verbose args)
     (println "Refreshing classpath"))
-  (apply sh java-cmd "-Xms256m"
-         "-classpath" tools-cp
-         "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
-         "--config-user" config-user
-         "--config-project" config-project
-         "--libs-file" libs-file
-         "--cp-file" cp-file
-         "--jvm-file" jvm-file
-         "--main-file" main-file
-         tools-args))
+  (shell-command (into [java-cmd "-Xms256m"
+                        "-classpath" tools-cp
+                        "clojure.main" "-m" "clojure.tools.deps.alpha.script.make-classpath2"
+                        "--config-user" config-user
+                        "--config-project" config-project
+                        "--libs-file" libs-file
+                        "--cp-file" cp-file
+                        "--jvm-file" jvm-file
+                        "--main-file" main-file]
+                       tools-args)))
 
 (def cp
   (cond (:describe args) nil
@@ -286,12 +330,12 @@ For more info, see:
     (println "}")))
 
 (cond (:pom args)
-      (sh java-cmd "-Xms256m"
-          "-classpath" tools-cp
-          "clojure.main" "-m" "clojure.tools.deps.alpha.script.generate-manifest2"
-          "--config-user" config-user
-          "--config-project" config-project
-          "--gen=pom" (str/join " " tools-args))
+      (shell-command [java-cmd "-Xms256m"
+                      "-classpath" tools-cp
+                      "clojure.main" "-m" "clojure.tools.deps.alpha.script.generate-manifest2"
+                      "--config-user" config-user
+                      "--config-project" config-project
+                      "--gen=pom" (str/join " " tools-args)])
       (:print-classpath args)
       (println cp)
       (:describe args)
@@ -309,15 +353,21 @@ For more info, see:
                  [:main-aliases (str (:main-aliases args))]
                  [:all-aliases (str (:all-aliases args))]])
       (:tree args)
-      (println (str/trim (:out (sh java-cmd "-Xms256m"
-                                   "-classpath" tools-cp
-                                   "clojure.main" "-m" "clojure.tools.deps.alpha.script.print-tree"
-                                   "--libs-file" libs-file))))
+      (println (str/trim (shell-command [java-cmd "-Xms256m"
+                                         "-classpath" tools-cp
+                                         "clojure.main" "-m" "clojure.tools.deps.alpha.script.print-tree"
+                                         "--libs-file" libs-file]
+                                        {:to-string? true})))
       (:trace args)
       (println "Writing trace.edn")
       :else
       (let [jvm-cache-opts (when (.exists (io/file jvm-file))
                              (slurp jvm-file))
             main-cache-opts (when (.exists (io/file main-file))
-                              (slurp main-file))]
-        (println (apply sh java-cmd jvm-cache-opts (:jvm-opts args) (str "-Dclojure.libfile=" libs-file) "--classpath" cp "clojure.main" main-cache-opts *command-line-args*))))
+                              (slurp main-file))
+            main-cache-opts (when main-cache-opts (str/split main-cache-opts #"\s"))
+            main-args (into (vector java-cmd jvm-cache-opts (:jvm-opts args) (str "-Dclojure.libfile=" libs-file) "-classpath" cp "clojure.main") main-cache-opts)
+            main-args (filterv some? main-args)
+            main-args (into main-args (:args args))]
+        ;; (prn main-args)
+        (shell-command main-args)))
