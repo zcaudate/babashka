@@ -15,6 +15,7 @@
    [babashka.impl.repl :as repl]
    [babashka.impl.socket-repl :as socket-repl]
    [babashka.impl.tools.cli :refer [tools-cli-namespace]]
+   [babashka.impl.xml :as xml]
    [babashka.wait :as wait]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
@@ -232,7 +233,8 @@ Everything after that is bound to *command-line-args*."))
    'cheshire.core cheshire-core-namespace
    'clojure.stacktrace stacktrace-namespace
    'clojure.main {'demunge demunge}
-   'clojure.repl {'demunge demunge}})
+   'clojure.repl {'demunge demunge}
+   'clojure.data.xml xml/xml-namespace})
 
 (def bindings
   {'java.lang.System/exit exit ;; override exit, so we have more control
