@@ -1,7 +1,10 @@
 (ns babashka.impl.async
   {:no-doc true}
-  (:require [clojure.core.async :as async]
-            [clojure.core.async.impl.protocols :as protocols]))
+  (:require
+   [babashka.impl.clojure.core.async :as async]
+   [babashka.impl.clojure.core.async.impl.ioc-macros :as ioc-macros]
+   [clojure.core.async.impl.dispatch :as dispatch]
+   [clojure.core.async.impl.protocols :as protocols]))
 
 (defn thread
   [_ _ & body]
@@ -73,3 +76,15 @@
 
 (def async-protocols-namespace
   {'ReadPort protocols/ReadPort})
+
+(def dispatch-namespace
+  {'run dispatch/run})
+
+(def ioc-macros-namespace
+  {'USER-START-IDX ioc-macros/USER-START-IDX
+   'BINDINGS-IDX ioc-macros/BINDINGS-IDX
+   'run-state-machine-wrapped ioc-macros/run-state-machine-wrapped
+   'aget-object ioc-macros/aget-object
+   'aset-object ioc-macros/aset-object
+   'aset-all! (with-meta @#'ioc-macros/aset-all! {:sci/macro true})
+   'return-chan ioc-macros/return-chan})

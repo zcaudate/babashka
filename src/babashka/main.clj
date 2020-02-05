@@ -1,7 +1,10 @@
 (ns babashka.main
   {:no-doc true}
   (:require
-   [babashka.impl.async :refer [async-namespace async-protocols-namespace]]
+   [babashka.impl.async :refer [async-namespace
+                                async-protocols-namespace
+                                ioc-macros-namespace
+                                dispatch-namespace]]
    [babashka.impl.cheshire :refer [cheshire-core-namespace]]
    [babashka.impl.classes :as classes]
    [babashka.impl.classpath :as cp]
@@ -260,14 +263,8 @@ Everything after that is bound to *command-line-args*."))
    'clojure.repl {'demunge demunge}
    'clojure.test t/clojure-test-namespace
    'babashka.classpath {'add-classpath add-classpath*}
-   'clojure.core.async.impl.dispatch {'run clojure.core.async.impl.dispatch/run}
-   'clojure.core.async.impl.ioc-macros {'USER-START-IDX clojure.core.async.impl.ioc-macros/USER-START-IDX
-                                        'BINDINGS-IDX clojure.core.async.impl.ioc-macros/BINDINGS-IDX
-                                        'run-state-machine-wrapped clojure.core.async.impl.ioc-macros/run-state-machine-wrapped
-                                        'aget-object clojure.core.async.impl.ioc-macros/aget-object
-                                        'aset-object clojure.core.async.impl.ioc-macros/aset-object
-                                        'aset-all! (with-meta @#'clojure.core.async.impl.ioc-macros/aset-all! {:sci/macro true})
-                                        'return-chan clojure.core.async.impl.ioc-macros/return-chan}})
+   'clojure.core.async.impl.dispatch dispatch-namespace
+   'clojure.core.async.impl.ioc-macros ioc-macros-namespace})
 
 (def bindings
   {'java.lang.System/exit exit ;; override exit, so we have more control

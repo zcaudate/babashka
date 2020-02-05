@@ -14,7 +14,7 @@
                  [borkdude/edamame "0.0.10"]
                  [borkdude/graal.locking "0.0.2"]
                  [borkdude/sci.impl.reflector "0.0.1"]
-                 [org.clojure/core.async "0.4.500"]
+                 [org.clojure/core.async "0.7.559"]
                  [org.clojure/tools.cli "0.4.2"]
                  [org.clojure/data.csv "0.1.4"]
                  [cheshire "5.9.0"]]
