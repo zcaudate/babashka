@@ -14,10 +14,12 @@
       :no-doc true}
     babashka.impl.clojure.core.server
   (:refer-clojure :exclude [locking])
+  (:require [sci.core :as sci]
+            [sci.impl.vars :as vars])
   (:import
    [clojure.lang LineNumberingPushbackReader]
    [java.net InetAddress Socket ServerSocket SocketException]
-   [java.io Reader Writer PrintWriter BufferedWriter BufferedReader InputStreamReader OutputStreamWriter]))
+   [java.io BufferedWriter InputStreamReader OutputStreamWriter]))
 
 (set! *warn-on-reflection* true)
 
@@ -41,9 +43,10 @@
     args - to pass to accept-fn"
   [^Socket conn client-id in out err accept args]
   (try
-    (binding [*in* in
-              *out* out
-              *err* err]
+    (sci/with-bindings {sci/in in
+                        sci/out out
+                        sci/err err
+                        vars/current-ns (vars/->SciNamespace 'user)}
       (swap! server assoc-in [:sessions client-id] {})
       (apply accept args))
     (catch SocketException _disconnect)

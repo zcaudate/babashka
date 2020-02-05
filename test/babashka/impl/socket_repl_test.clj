@@ -5,7 +5,8 @@
    [clojure.java.shell :refer [sh]]
    [clojure.string :as str]
    [clojure.test :as t :refer [deftest is testing]]
-   [clojure.java.io :as io]))
+   [clojure.java.io :as io]
+   [sci.impl.opts :refer [init]]))
 
 (set! *warn-on-reflection* true)
 
@@ -31,13 +32,10 @@
 (deftest socket-repl-test
   (try
     (if tu/jvm?
-      (start-repl! "0.0.0.0:1666" {:bindings {(with-meta '*in*
-                                                {:sci/deref! true})
-                                              (delay [1 2 3])
-                                              '*command-line-args*
-                                              ["a" "b" "c"]}
-                                   :env (atom {})
-                                   :features #{:bb}})
+      (start-repl! "0.0.0.0:1666" (init {:bindings {'*command-line-args*
+                                                    ["a" "b" "c"]}
+                                         :env (atom {})
+                                         :features #{:bb}}))
       (future
         (sh "bash" "-c"
             "echo '[1 2 3]' | ./bb --socket-repl 0.0.0.0:1666 a b c")))
@@ -47,8 +45,6 @@
                           (sh "bash" "-c"
                               "lsof -t -i:1666"))))))
     (is (socket-command "(+ 1 2 3)" "user=> 6"))
-    (testing "*in*"
-      (is (socket-command "*in*" "[1 2 3]")))
     (testing "*command-line-args*"
       (is (socket-command '*command-line-args* "\"a\" \"b\" \"c\"")))
     (testing "&env"
@@ -59,6 +55,8 @@
       (is (socket-command "#?(:bb 1337 :clj 8888)" "1337")))
     (testing "*1, *2, *3, *e"
       (is (socket-command "1\n*1" "1")))
+    (testing "*ns*"
+      (is (socket-command "(ns foo.bar) (ns-name *ns*)" "foo.bar")))
     (finally
       (if tu/jvm?
         (stop-repl!)
@@ -72,7 +70,7 @@
   (dotimes [_ 1000]
     (t/run-tests))
   (stop-repl!)
-  (start-repl! "0.0.0.0:1666" {:bindings {(with-meta '*in*
+  (start-repl! "0.0.0.0:1666" {:bindings {(with-meta '*input*
                                             {:sci/deref! true})
                                           (delay [1 2 3])
                                           '*command-line-args*

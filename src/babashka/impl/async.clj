@@ -1,6 +1,7 @@
 (ns babashka.impl.async
   {:no-doc true}
-  (:require [clojure.core.async :as async]))
+  (:require [clojure.core.async :as async]
+            [clojure.core.async.impl.protocols :as protocols]))
 
 (defn thread
   [_ _ & body]
@@ -70,3 +71,5 @@
    '>! async/>!
    '<! async/<!})
 
+(def async-protocols-namespace
+  {'ReadPort protocols/ReadPort})

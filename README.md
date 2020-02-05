@@ -1,18 +1,24 @@
-# babashka
+<img src="logo/babashka.svg" width="425px">
 
 [![CircleCI](https://circleci.com/gh/borkdude/babashka/tree/master.svg?style=shield)](https://circleci.com/gh/borkdude/babashka/tree/master)
 [![Clojars Project](https://img.shields.io/clojars/v/borkdude/babashka.svg)](https://clojars.org/borkdude/babashka)
-[![cljdoc badge](https://cljdoc.org/badge/borkdude/babashka)](https://cljdoc.org/d/borkdude/babashka/CURRENT)
 [![project chat](https://img.shields.io/badge/slack-join_chat-brightgreen.svg)](https://app.slack.com/client/T03RZGPFR/CLX41ASCS)
 
+<!-- [![cljdoc badge](https://cljdoc.org/badge/borkdude/babashka)](https://cljdoc.org/d/borkdude/babashka/CURRENT) -->
 
 A Clojure [babushka](https://en.wikipedia.org/wiki/Headscarf) for the grey areas of Bash.
+
+<blockquote class="twitter-tweet" data-lang="en">
+    <p lang="en" dir="ltr">Life's too short to remember how to write Bash code. I feel liberated.</p>
+    &mdash;
+    <a href="https://github.com/laheadle">@laheadle</a> on Clojurians Slack
+</blockquote>
 
 ## Quickstart
 
 ``` shellsession
 $ bash <(curl -s https://raw.githubusercontent.com/borkdude/babashka/master/install)
-$ ls | bb --time -i '(filter #(-> % io/file .isDirectory) *in*)'
+$ ls | bb --time -i '(filter #(-> % io/file .isDirectory) *input*)'
 ("doc" "resources" "sci" "script" "src" "target" "test")
 bb took 4ms.
 ```
@@ -41,45 +47,42 @@ Non-goals:
 * Provide a mixed Clojure/bash DSL (see portability).
 * Replace existing shells. Babashka is a tool you can use inside existing shells like bash and it is designed to play well with them. It does not aim to replace them.
 
-Reasons why babashka may not be the right fit for your use case:
-
-- It uses [sci](https://github.com/borkdude/sci) for interpreting Clojure. Sci
-implements only a subset of Clojure and is not as performant as compiled code.
-- External libraries are not available (although you may use `load-file` for
-  loading external scripts).
+Babashka uses [sci](https://github.com/borkdude/sci) for interpreting Clojure. Sci
+implements a subset of Clojure and is not as performant as compiled code. If your script is taking more than a few seconds,  Clojure on the JVM may be a better fit.
 
 Read more about the differences with Clojure [here](#differences-with-clojure).
 
 ## Status
 
-Experimental. Breaking changes are expected to happen at this phase.
+Experimental. Breaking changes are expected to happen at this phase. Keep an eye
+on [CHANGES.md](CHANGES.md) for a list of breaking changes.
 
 ## Examples
 
 ``` shellsession
-$ ls | bb -i '*in*'
-["LICENSE" "README.md" "bb" "doc" "pom.xml" "project.clj" "reflection.json" "resources" "script" "src" "target" "test"]
+$ ls | bb -i '*input*'
+["LICENSE" "README.md" "bb" "doc" "pom.xml" "project.clj" "resources" "script" "src" "target" "test"]
 
-$ ls | bb -i '(count *in*)'
+$ ls | bb -i '(count *input*)'
 12
 
-$ bb '(vec (dedupe *in*))' <<< '[1 1 1 1 2]'
+$ bb '(vec (dedupe *input*))' <<< '[1 1 1 1 2]'
 [1 2]
 
-$ bb '(filterv :foo *in*)' <<< '[{:foo 1} {:bar 2}]'
+$ bb '(filterv :foo *input*)' <<< '[{:foo 1} {:bar 2}]'
 [{:foo 1}]
 
-$ bb '(#(+ %1 %2 %3) 1 2 *in*)' <<< 3
+$ bb '(#(+ %1 %2 %3) 1 2 *input*)' <<< 3
 6
 
-$ ls | bb -i '(filterv #(re-find #"reflection" %) *in*)'
-["reflection.json"]
+$ ls | bb -i '(filterv #(re-find #"README" %) *input*)'
+["README.md"]
 
 $ bb '(run! #(shell/sh "touch" (str "/tmp/test/" %)) (range 100))'
-$ ls /tmp/test | bb -i '*in*'
+$ ls /tmp/test | bb -i '*input*'
 ["0" "1" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "2" "20" "21" ...]
 
-$ bb -O '(repeat "dude")' | bb --stream '(str *in* "rino")' | bb -I '(take 3 *in*)'
+$ bb -O '(repeat "dude")' | bb --stream '(str *input* "rino")' | bb -I '(take 3 *input*)'
 ("duderino" "duderino" "duderino")
 ```
 
@@ -106,6 +109,11 @@ Upgrade:
 
     yay -S babashka-bin
 
+### Windows
+
+On Windows you can install using [scoop](https://scoop.sh/) and the
+[scoop-clojure](https://github.com/littleli/scoop-clojure) bucket.
+
 ### Installer script
 
 Install via the installer script:
@@ -128,27 +136,32 @@ You may also download a binary from [Github](https://github.com/borkdude/babashk
 
 ``` shellsession
 Usage: bb [ -i | -I ] [ -o | -O ] [ --stream ] [--verbose]
-          [ ( --classpath | -cp ) <cp> ] [ ( --main | -m ) <main-namespace> ]
-          ( -e <expression> | -f <file> | --repl | --socket-repl [<host>:]<port> )
+          [ ( --classpath | -cp ) <cp> ] [ --uberscript <file> ]
+          [ ( --main | -m ) <main-namespace> | -e <expression> | -f <file> |
+            --repl | --socket-repl [<host>:]<port> ]
           [ arg* ]
 
 Options:
 
-  --help, -h or -?   Print this help text.
-  --version          Print the current version of babashka.
-  -i                 Bind *in* to a lazy seq of lines from stdin.
-  -I                 Bind *in* to a lazy seq of EDN values from stdin.
-  -o                 Write lines to stdout.
-  -O                 Write EDN values to stdout.
-  --verbose          Print entire stacktrace in case of exception.
-  --stream           Stream over lines or EDN values from stdin. Combined with -i or -I *in* becomes a single value per iteration.
-  -e, --eval <expr>  Evaluate an expression.
-  -f, --file <path>  Evaluate a file.
-  -cp, --classpath   Classpath to use.
-  -m, --main <ns>    Call the -main function from namespace with args.
-  --repl             Start REPL
-  --socket-repl      Start socket REPL. Specify port (e.g. 1666) or host and port separated by colon (e.g. 127.0.0.1:1666).
-  --time             Print execution time before exiting.
+  --help, -h or -?    Print this help text.
+  --version           Print the current version of babashka.
+
+  -i                  Bind *input* to a lazy seq of lines from stdin.
+  -I                  Bind *input* to a lazy seq of EDN values from stdin.
+  -o                  Write lines to stdout.
+  -O                  Write EDN values to stdout.
+  --verbose           Print entire stacktrace in case of exception.
+  --stream            Stream over lines or EDN values from stdin. Combined with -i or -I *input* becomes a single value per iteration.
+  --uberscript <file> Collect preloads, -e, -f and -m and all required namespaces from the classpath into a single executable file.
+
+  -e, --eval <expr>   Evaluate an expression.
+  -f, --file <path>   Evaluate a file.
+  -cp, --classpath    Classpath to use.
+  -m, --main <ns>     Call the -main function from namespace with args.
+  --repl              Start REPL
+  --socket-repl       Start socket REPL. Specify port (e.g. 1666) or host and port separated by colon (e.g. 127.0.0.1:1666).
+  --time              Print execution time before exiting.
+  --                  Stop parsing args and pass everything after -- to *command-line-args*
 
 If neither -e, -f, or --socket-repl are specified, then the first argument that is not parsed as a option is treated as a file if it exists, or as an expression otherwise.
 Everything after that is bound to *command-line-args*.
@@ -165,40 +178,23 @@ enumerated explicitly.
 - `clojure.set` aliased as `set`
 - `clojure.edn` aliased as `edn`:
   - `read-string`
-- `clojure.java.shell` aliases as `shell`:
-  - `sh`
+- `clojure.java.shell` aliased as `shell`
 - `clojure.java.io` aliased as `io`:
-  - `as-relative-path`, `copy`, `delete-file`, `file`
+  - `as-relative-path`, `as-url`, `copy`, `delete-file`, `file`, `input-stream`,
+    `make-parents`, `output-stream`, `reader`, `resource`, `writer`
+- `clojure.main`: `repl`
 - [`clojure.core.async`](https://clojure.github.io/core.async/) aliased as
   `async`. The `alt` and `go` macros are not available but `alts!!` does work as
   it is a function.
-- [`me.raynes.conch.low-level`](https://github.com/clj-commons/conch#low-level-usage)
-  aliased as `conch`
+- `clojure.stacktrace`
+- `clojure.test`
 - [`clojure.tools.cli`](https://github.com/clojure/tools.cli) aliased as `tools.cli`
 - [`clojure.data.csv`](https://github.com/clojure/data.csv) aliased as `csv`
 - [`cheshire.core`](https://github.com/dakrone/cheshire) aliased as `json`
 
-The following Java classes are available:
+A selection of java classes are available, see `babashka/impl/classes.clj`.
 
-- `ArithmeticException`
-- `AssertionError`
-- `Boolean`
-- `Class`
-- `Double`
-- `Exception`
-- `clojure.lang.ExceptionInfo`
-- `Integer`
-- `java.io.File`
-- `java.nio.Files`
-- `java.util.regex.Pattern`
-- `String`
-- `System`
-- `Thread`
-
-More classes can be added by request. See `reflection.json` and the `:classes`
-option in `main.clj`.
-
-Babashka supports `import` : `(import clojure.lang.ExceptionInfo)`.
+Babashka supports `import`: `(import clojure.lang.ExceptionInfo)`.
 
 Babashka supports a subset of the `ns` form where you may use `:require` and `:import`:
 
@@ -211,15 +207,70 @@ Babashka supports a subset of the `ns` form where you may use `:require` and `:i
 For the unsupported parts of the ns form, you may use [reader
 conditionals](#reader-conditionals) to maintain compatibility with JVM Clojure.
 
-Special vars:
+### Input and output flags
 
-- `*in*`: contains the input read from stdin. EDN by default, multiple lines of
-text with the `-i` option, or multiple EDN values with the `-I` option.
-- `*command-line-args*`: contain the command line args
+In one-liners the `*input*` value may come in handy. It contains the input read from stdin as EDN by default. If you want to read in text, use the `-i` flag, which binds `*input*` to a lazy seq of lines of text. If you want to read multiple EDN values, use the `-I` flag. The `-o` option prints the result as lines of text. The `-O` option prints the result as lines of EDN values.
 
-Additionally, babashka adds the following functions:
+The following table illustrates the combination of options for commands of the form
 
-- `wait/wait-for-port`. Usage:
+    echo "{{Input}}" | bb {{Input flags}} {{Output flags}} "*input*"
+
+| Input          | Input flags | Output flag | `*input*`     | Output   |
+|----------------|-------------|-------------|---------------|----------|
+| `{:a 1}` <br> `{:a 2}` |             |             | `{:a 1}`      | `{:a 1}` |
+| hello <br> bye | `-i`        |             | `("hello" "bye")` |  `("hello" "bye")` |
+| hello <br> bye | `-i`        |  `-o`       | `("hello" "bye")` |  hello <br> bye  |
+| `{:a 1}` <br> `{:a 2}` | `-I`        |        | `({:a 1} {:a 2})` |  `({:a 1} {:a 2})`   |
+| `{:a 1}` <br> `{:a 2}` | `-I` |  `-O`      | `({:a 1} {:a 2})` |  `{:a 1}` <br> `{:a 2}`   |
+
+When combined with the `--stream` option, the expression is executed for each value in the input:
+
+``` clojure
+$ echo '{:a 1} {:a 2}' | bb --stream '*input*'
+{:a 1}
+{:a 2}
+```
+
+### Current file path
+
+The var `*file*` contains the full path of the file that is currently being
+executed:
+
+``` shellsession
+$ cat example.clj
+(prn *file*)
+
+$ bb example.clj
+"/Users/borkdude/example.clj"
+```
+
+### Command-line arguments
+
+Command-line arguments can be retrieved using `*command-line-args*`.
+
+### Additional namespaces
+
+#### babashka.classpath
+
+Contains the function `add-classpath` which can be used to add to the classpath
+dynamically:
+
+``` clojure
+(require '[babashka.classpath :refer [add-classpath]]
+         '[clojure.java.shell :refer [sh]])
+(def medley-dep '{:deps {medley {:git/url "https://github.com/borkdude/medley"
+                                 :sha "91adfb5da33f8d23f75f0894da1defe567a625c0"}}})
+(def cp (:out (sh "clojure" "-Spath" "-Sdeps" (str medley-dep))))
+(add-classpath cp)
+(require '[medley.core :as m])
+(m/index-by :id [{:id 1} {:id 2}]) ;;=> {1 {:id 1}, 2 {:id 2}}
+```
+
+#### babashka.wait
+
+Contains the functions: `wait-for-port` and `wait-for-path`.
+
+Usage of `wait-for-port`:
 
 ``` clojure
 (wait/wait-for-port "localhost" 8080)
@@ -228,19 +279,25 @@ Additionally, babashka adds the following functions:
 
 Waits for TCP connection to be available on host and port. Options map supports `:timeout` and `:pause`. If `:timeout` is provided and reached, `:default`'s value (if any) is returned. The `:pause` option determines the time waited between retries.
 
-- `wait/wait-for-path`. Usage:
+Usage of `wait-for-path`:
 
 ``` clojure
 (wait/wait-for-path "/tmp/wait-path-test")
 (wait/wait-for-path "/tmp/wait-path-test" {:timeout 1000 :pause 1000})
 ```
 
-Waits for file path to be available. Options map supports `:default`, `:timeout` and `:pause`. If `:timeout` is provided and reached, `:default`'s value (if any) is returned. The `:pause` option determines the time waited between retries.
+Waits for file path to be available. Options map supports `:default`, `:timeout`
+and `:pause`. If `:timeout` is provided and reached, `:default`'s value (if any)
+is returned. The `:pause` option determines the time waited between retries.
 
-- `sig/pipe-signal-received?`. Usage:
+The namespace `babashka.wait` is aliased as `wait` in the `user` namespace.
+
+#### babashka.signal
+
+Contains the function `signal/pipe-signal-received?`. Usage:
 
 ``` clojure
-(sig/pipe-signal-received?)
+(signal/pipe-signal-received?)
 ```
 
 Returns true if `PIPE` signal was received. Example:
@@ -250,6 +307,8 @@ $ bb '((fn [x] (println x) (when (not (sig/pipe-signal-received?)) (recur (inc x
 1
 2
 ```
+
+The namespace `babashka.signal` is aliased as `signal` in the `user` namespace.
 
 ## Running a file
 
@@ -329,7 +388,7 @@ export BABASHKA_PRELOADS
 Note that you can concatenate multiple expressions. Now you can use these functions in babashka:
 
 ``` shellsession
-$ bb '(-> (foo *in*) bar)' <<< 1
+$ bb '(-> (foo *input*) bar)' <<< 1
 6
 ```
 
@@ -339,7 +398,7 @@ You can also preload an entire file using `load-file`:
 export BABASHKA_PRELOADS='(load-file "my_awesome_prelude.clj")'
 ```
 
-Note that `*in*` is not available in preloads.
+Note that `*input*` is not available in preloads.
 
 ## Classpath
 
@@ -361,10 +420,10 @@ Note that you can use the `clojure` tool to produce classpaths and download depe
 ``` shellsession
 $ cat deps.edn
 {:deps
-  {my_gist_script
-    {:git/url "https://gist.github.com/borkdude/263b150607f3ce03630e114611a4ef42"
-     :sha "cfc761d06dfb30bb77166b45d439fe8fe54a31b8"}}}
-
+ {my_gist_script
+  {:git/url "https://gist.github.com/borkdude/263b150607f3ce03630e114611a4ef42"
+   :sha "cfc761d06dfb30bb77166b45d439fe8fe54a31b8"}}
+ :aliases {:my-script {:main-opts ["-m" "my-gist-script"]}}}
 
 $ CLASSPATH=$(clojure -Spath)
 $ bb --classpath "$CLASSPATH" --main my-gist-script
@@ -378,6 +437,57 @@ variable will be used:
 $ export BABASHKA_CLASSPATH=$(clojure -Spath)
 $ export BABASHKA_PRELOADS="(require '[my-gist-script])"
 $ bb "(my-gist-script/-main)"
+Hello from gist script!
+```
+
+### Deps.clj
+
+The [`deps.clj`](https://github.com/borkdude/deps.clj/) script can be used to work with `deps.edn`-based projects:
+
+``` shell
+$ deps.clj -A:my-script -Scommand "bb -cp {{classpath}} {{main-opts}}"
+Hello from gist script!
+```
+
+Create these aliases for brevity:
+
+``` shell
+$ alias bbk='deps.clj -Scommand "bb -cp {{classpath}} {{main-opts}}"'
+$ alias babashka='rlwrap deps.clj -Scommand "bb -cp {{classpath}} {{main-opts}}"'
+$ bbk -A:my-script
+Hello from gist script!
+$ babashka
+Babashka v0.0.58 REPL.
+Use :repl/quit or :repl/exit to quit the REPL.
+Clojure rocks, Bash reaches.
+
+user=> (require '[my-gist-script :as mgs])
+nil
+user=> (mgs/-main)
+Hello from gist script!
+nil
+```
+
+## Uberscript
+
+The `--uberscript` option collects the expressions in
+`BABASHKA_PRELOADS`, the command line expression or file, the main entrypoint
+and all required namespaces from the classpath into a single file. This can be
+convenient for debugging and deployment.
+
+Given the `deps.edn` from above:
+
+``` clojure
+$ deps.clj -A:my-script -Scommand "bb -cp {{classpath}} {{main-opts}} --uberscript my-script.clj"
+
+$ cat my-script.clj
+(ns my-gist-script)
+(defn -main [& args]
+  (println "Hello from gist script!"))
+(ns user (:require [my-gist-script]))
+(apply my-gist-script/-main *command-line-args*)
+
+$ bb my-script.clj
 Hello from gist script!
 ```
 
@@ -418,6 +528,19 @@ $ ./bb example.clj
 babashka doesn't support in-ns yet!
 ```
 
+## Running tests
+
+Babashka bundles `clojure.test`. To make CI scripts fail you can use a simple
+runner like this:
+
+``` shell
+#!/usr/bin/env bash
+bb -cp "src:test:resources" \
+   -e "(require '[clojure.test :as t] '[borkdude.deps-test])
+       (let [{:keys [:fail :error]} (t/run-tests 'borkdude.deps-test)]
+         (System/exit (+ fail error)))"
+```
+
 ## Socket REPL
 
 Start the socket REPL like this:
@@ -446,22 +569,27 @@ A socket REPL client for Emacs is
 
 ## Spawning and killing a process
 
-You may use the `conch` namespace for this. It maps to
-[`me.raynes.conch.low-level`](https://github.com/clj-commons/conch#low-level-usage).
+Use the `java.lang.ProcessBuilder` class.
 
 Example:
 
 ``` clojure
-$ bb '
-(def ws (conch/proc "python" "-m" "SimpleHTTPServer" "1777"))
-(net/wait-for-it "localhost" 1777) (conch/destroy ws)'
+user=> (def ws (-> (ProcessBuilder. ["python" "-m" "SimpleHTTPServer" "1777"]) (.start)))
+#'user/ws
+user=> (wait/wait-for-port "localhost" 1777)
+{:host "localhost", :port 1777, :took 2}
+user=> (.destroy ws)
+nil
 ```
+
+Also see this [example](examples/process_builder.clj).
 
 ## Async
 
-Apart from `future` for creating threads and the `conch` namespace for creating
-processes, you may use the `async` namespace, which maps to `clojure.core.async`,  for asynchronous scripting. The following
-example shows how to get first available value from two different processes:
+Apart from `future` and `pmap` for creating threads, you may use the `async`
+namespace, which maps to `clojure.core.async`, for asynchronous scripting. The
+following example shows how to get first available value from two different
+processes:
 
 ``` clojure
 bb '
@@ -487,56 +615,113 @@ same. Multi-threading is supported (`pmap`, `future`).
 
 Differences with Clojure:
 
-- No first class vars. Note that you can define and redefine global values with
-`def` / `defn`, but there is no `var` indirection.
-
 - A subset of Java classes are supported.
 
-- Only the `clojure.core`, `clojure.set`, `clojure.string` and `clojure.walk`
-  namespaces are available from Clojure.
+- Only the `clojure.core`, `clojure.edn`, `clojue.java.io`,
+  `clojure.java.shell`, `clojure.set`, `clojure.stacktrace`, `clojure.string`,
+  `clojure.template`, `clojure.test` and `clojure.walk` namespaces are available
+  from Clojure.
 
 - Interpretation comes with overhead. Therefore tight loops are likely slower
   than in Clojure on the JVM.
 
 - No support for unboxed types.
 
-## Developing Babashka
+## External resources
 
-To work on Babashka itself make sure Git submodules are checked out.
+### Tools and libraries
 
-``` shellsession
-$ git clone https://github.com/borkdude/babashka --recursive
+The following libraries are known to work with Babashka:
+
+#### [deps.clj](https://github.com/borkdude/deps.clj)
+
+A port of the [clojure](https://github.com/clojure/brew-install/) bash script to
+Clojure / babashka.
+
+#### [spartan.spec](https://github.com/borkdude/spartan.spec/)
+
+An babashka-compatible implementation of `clojure.spec.alpha`.
+
+#### [missing.test.assertions](https://github.com/borkdude/missing.test.assertions)
+
+This library checks if no assertions have been made in a test:
+
+``` shell
+$ export BABASHKA_CLASSPATH=$(clojure -Spath -Sdeps '{:deps {borkdude/missing.test.assertions {:git/url "https://github.com/borkdude/missing.test.assertions" :sha "603cb01bee72fb17addacc53c34c85612684ad70"}}}')
+
+$ lein bb "(require '[missing.test.assertions] '[clojure.test :as t]) (t/deftest foo) (t/run-tests)"
+
+Testing user
+WARNING: no assertions made in test foo
+
+Ran 1 tests containing 0 assertions.
+0 failures, 0 errors.
+{:test 1, :pass 0, :fail 0, :error 0, :type :summary}
 ```
 
-To update later on:
+#### [medley](https://github.com/borkdude/medley/)
 
-``` shellsession
-$ git submodule update --recursive
+A fork of [medley](https://github.com/weavejester/medley) made compatible with
+babashka. Requires `bb` >= v0.0.58.
+
+#### [clj-http-lite](https://github.com/borkdude/clj-http-lite)
+
+This fork does not depend on any other libraries. Example:
+
+``` shell
+$ export BABASHKA_CLASSPATH="$(clojure -Sdeps '{:deps {clj-http-lite {:git/url "https://github.com/borkdude/clj-http-lite" :sha "f44ebe45446f0f44f2b73761d102af3da6d0a13e"}}}' -Spath)"
+
+$ bb "(require '[clj-http.lite.client :as client]) (:status (client/get \"https://www.clojure.org\"))"
+200
 ```
 
-You need [Leiningen](https://leiningen.org/), and for building binaries you need GraalVM.
+#### [limit-break](https://github.com/technomancy/limit-break)
 
-### REPL
+A debug REPL library. Example:
 
-`lein repl` will get you a standard REPL/nREPL connection. To work on tests use `lein with-profiles +test repl`.
+``` shell
+$ export BABASHKA_CLASSPATH="$(clojure -Sdeps '{:deps {limit-break {:git/url "https://github.com/technomancy/limit-break" :sha "050fcfa0ea29fe3340927533a6fa6fffe23bfc2f" :deps/manifest :deps}}}' -Spath)"
 
-### Test
+$ bb "(require '[limit.break :as lb]) (let [x 1] (lb/break))"
+Babashka v0.0.49 REPL.
+Use :repl/quit or :repl/exit to quit the REPL.
+Clojure rocks, Bash reaches.
 
-Test on the JVM (for development):
+break> x
+1
+```
 
-    script/test
+#### [clojure-csv](https://github.com/davidsantiago/clojure-csv)
 
-Test the native version:
+A library for reading and writing CSV files. Note that babashka already comes
+with `clojure.data.csv`, but in case you need this other library, this is how
+you can use it:
 
-    BABASHKA_TEST_ENV=native script/test
+``` shell
+export BABASHKA_CLASSPATH="$(clojure -Sdeps '{:deps {clojure-csv {:mvn/version "RELEASE"}}}' -Spath)"
 
-### Build
+./bb -e "
+(require '[clojure-csv.core :as csv])
+(csv/write-csv (csv/parse-csv \"a,b,c\n1,2,3\"))
+"
+```
 
-To build this project, set `$GRAALVM_HOME` to the GraalVM distribution directory.
+#### [spartan.test](https://github.com/borkdude/spartan.test/)
 
-Then run:
+A minimal test framework compatible with babashka. This library is deprecated
+since babashka v0.0.68 which has `clojure.test` built-in.
 
-    script/compile
+
+### Blogs
+
+- [Clojure Start Time in 2019](https://stuartsierra.com/2019/12/21/clojure-start-time-in-2019) by Stuart Sierra
+- [Advent of Random
+  Hacks](https://lambdaisland.com/blog/2019-12-19-advent-of-parens-19-advent-of-random-hacks)
+  by Arne Brasseur
+- [Clojure in the Shell](https://lambdaisland.com/blog/2019-12-05-advent-of-parens-5-clojure-in-the-shell) by Arne Brasseur
+- [Clojure Tool](https://purelyfunctional.tv/issues/purelyfunctional-tv-newsletter-351-clojure-tool-babashka/) by Eric Normand
+
+## [Developing Babashka](doc/dev.md)
 
 ## Related projects
 
@@ -553,7 +738,7 @@ welcome!
 ### Delete a list of files returned by a Unix command
 
 ```
-find . | grep conflict | bb -i '(doseq [f *in*] (.delete (io/file f)))'
+find . | grep conflict | bb -i '(doseq [f *input*] (.delete (io/file f)))'
 ```
 
 ### Calculate aggregate size of directory
@@ -587,7 +772,7 @@ $ cat /tmp/test.txt
 3 Babashka
 4 Goodbye
 
-$ < /tmp/test.txt bb -io '(shuffle *in*)'
+$ < /tmp/test.txt bb -io '(shuffle *input*)'
 3 Babashka
 2 Clojure
 4 Goodbye
@@ -601,25 +786,44 @@ For converting JSON to EDN, see [jet](https://github.com/borkdude/jet).
 ``` shellsession
 $ curl -s https://api.github.com/repos/borkdude/babashka/tags |
 jet --from json --keywordize --to edn |
-bb '(-> *in* first :name (subs 1))'
+bb '(-> *input* first :name (subs 1))'
 "0.0.4"
 ```
 
-### Get latest OS-specific download url from Github
+### Generate deps.edn entry for a gitlib
 
-``` shellsession
-$ curl -s https://api.github.com/repos/borkdude/babashka/releases |
-jet --from json --keywordize |
-bb '(-> *in* first :assets)' |
-bb '(some #(re-find #".*linux.*" (:browser_download_url %)) *in*)'
-"https://github.com/borkdude/babashka/releases/download/v0.0.4/babashka-0.0.4-linux-amd64.zip"
+``` clojure
+#!/usr/bin/env bb
+
+(require '[clojure.java.shell :refer [sh]]
+         '[clojure.string :as str])
+
+(let [[username project branch] *command-line-args*
+      branch (or branch "master")
+      url (str "https://github.com/" username "/" project)
+      sha (-> (sh "git" "ls-remote" url branch)
+              :out
+              (str/split #"\s")
+              first)]
+  {:git/url url
+   :sha sha})
+```
+
+``` shell
+$ gitlib.clj nate fs
+{:git/url "https://github.com/nate/fs", :sha "75b9fcd399ac37cb4f9752a4c7a6755f3fbbc000"}
+$ clj -Sdeps "{:deps {fs $(gitlib.clj nate fs)}}" \
+  -e "(require '[nate.fs :as fs]) (fs/creation-time \".\")"
+#object[java.nio.file.attribute.FileTime 0x5c748168 "2019-07-05T14:06:26Z"]
 ```
 
 ### View download statistics from Clojars
 
+Contributed by [@plexus](https://github.com/plexus).
+
 ``` shellsession
 $ curl https://clojars.org/stats/all.edn |
-bb -o '(for [[[group art] counts] *in*] (str (reduce + (vals counts))  " " group "/" art))' |
+bb -o '(for [[[group art] counts] *input*] (str (reduce + (vals counts))  " " group "/" art))' |
 sort -rn |
 less
 14113842 clojure-complete/clojure-complete
@@ -665,6 +869,29 @@ clj-http/clj-http can be upgraded from 3.4.0 to 3.10.0
 cheshire/cheshire can be upgraded from 5.8.1 to 5.9.0
 ```
 
+### Convert project.clj to deps.edn
+
+Contributed by [@plexus](https://github.com/plexus).
+
+``` shellsession
+$ cat project.clj |
+sed -e 's/#=//g' -e 's/~@//g' -e 's/~//g' |
+bb '(let [{:keys [dependencies source-paths resource-paths]} (apply hash-map (drop 3 *input*))]
+  {:paths (into source-paths resource-paths)
+   :deps (into {} (for [[d v] dependencies] [d {:mvn/version v}]))}) ' |
+jet --pretty > deps.edn
+```
+
+### Print current time in California
+
+See [examples/pst.clj](https://github.com/borkdude/babashka/blob/master/examples/pst.clj)
+
+### Tiny http server
+
+See [examples/http_server.clj](https://github.com/borkdude/babashka/blob/master/examples/http_server.clj)
+
+Original by [@souenzzo](https://gist.github.com/souenzzo/a959a4c5b8c0c90df76fe33bb7dfe201)
+
 ## Thanks
 
 - [adgoji](https://www.adgoji.com/) for financial support
@@ -677,5 +904,3 @@ Distributed under the EPL License. See LICENSE.
 
 This project contains code from:
 - Clojure, which is licensed under the same EPL License.
-- [conch](https://github.com/clj-commons/conch), which is licensed under the
-same EPL License.
