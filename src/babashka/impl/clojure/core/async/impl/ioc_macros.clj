@@ -12,23 +12,20 @@
 (ns ^{:skip-wiki true}
     babashka.impl.clojure.core.async.impl.ioc-macros
   (:refer-clojure :exclude [all])
-  (:require [clojure.core.async.impl.dispatch :as dispatch]
-            [clojure.core.async.impl.protocols :as impl]
-            [clojure.pprint :refer [pprint]]
+  (:require [clojure.core.async.impl.protocols :as impl]
+            ;; [clojure.pprint :refer [pprint]]
             [clojure.set :refer (intersection union difference)]
-            [clojure.tools.analyzer :as an]
             [clojure.tools.analyzer.ast :as ast]
             [clojure.tools.analyzer.env :as env]
             [clojure.tools.analyzer.jvm :as an-jvm]
             [clojure.tools.analyzer.passes :refer [schedule]]
             [clojure.tools.analyzer.passes.jvm.annotate-loops :refer [annotate-loops]]
             [clojure.tools.analyzer.passes.jvm.warn-on-reflection :refer [warn-on-reflection]]
-            [sci.impl.vars :as vars]
             [clojure.core.async.impl.ioc-macros])
   (:import [java.util.concurrent.atomic AtomicReferenceArray]
            [java.util.concurrent.locks Lock]))
 
-(defn debug [x]
+#_(defn debug [x]
   (pprint x)
   x)
 
@@ -161,7 +158,7 @@
 
 (defn print-plan []
   (fn [plan]
-    (pprint plan)
+    (print plan)
     [nil plan]))
 
 (defn set-block
@@ -1083,7 +1080,7 @@
                                    :form local
                                    :name local}])))))
 
-(defn pdebug [x]
+#_(defn pdebug [x]
   (clojure.pprint/pprint x)
   (println "----")
   x)
