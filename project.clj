@@ -25,7 +25,11 @@
                  [clj-commons/clj-yaml "0.7.1"]
                  [com.cognitect/transit-clj "1.0.324"]
                  [seancorfield/next.jdbc "1.0.424"]
-                 [org.postgresql/postgresql "42.2.5"]]
+                 [org.postgresql/postgresql "42.2.12"]
+                 [mysql/mysql-connector-java "8.0.19"]
+                 ;; note: [mysql/mysql-connector-java "8.0.19"] didn't work
+                 ;; note: [org.mariadb.jdbc/mariadb-java-client "2.6.0"] didn't work
+                 ]
   :profiles {:test {:dependencies [[clj-commons/conch "0.9.2"]
                                    [com.clojure-goes-fast/clj-async-profiler "0.4.0"]]}
              :uberjar {:global-vars {*assert* false}

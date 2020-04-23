@@ -108,6 +108,11 @@
           java.util.zip.GZIPOutputStream
           org.yaml.snakeyaml.error.YAMLException
           ~(symbol "[B")
+          ;; mysql
+          com.mysql.cj.exceptions.WrongArgumentException
+          com.mysql.cj.jdbc.Driver
+          com.mysql.cj.conf.url.SingleConnectionUrl
+          com.mysql.cj.protocol.StandardSocketFactory
           ]
     :constructors [clojure.lang.Delay
                    clojure.lang.MapEntry
@@ -184,10 +189,14 @@
                         {:name "toExternalForm"}
                         {:name "toString"}
                         {:name "toURI"}]}
+             ;; clojure.data.xml
              com.sun.xml.internal.stream.XMLInputFactoryImpl
              {:methods [{:name "<init>" :parameterTypes []}]}
+             ;; clojure.data.xml
              com.sun.xml.internal.stream.XMLOutputFactoryImpl
-             {:methods [{:name "<init>" :parameterTypes []}]}}})
+             {:methods [{:name "<init>" :parameterTypes []}]}
+             com.mysql.cj.log.StandardLogger
+             {:methods [{:name "<init>" :parameterTypes ["java.lang.String"]}]}}})
 
 (defmacro gen-class-map []
   (let [classes (concat (:all classes)

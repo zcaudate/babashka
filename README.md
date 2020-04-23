@@ -800,3 +800,4 @@ Distributed under the EPL License. See LICENSE.
 
 This project contains code from:
 - Clojure, which is licensed under the same EPL License.
+- Quarkus (fixes for the mysql driver) which is licensed under the Apache 2.0 License.
