@@ -25,7 +25,8 @@
                  [clj-commons/clj-yaml "0.7.1"]
                  [com.cognitect/transit-clj "1.0.324"]
                  [seancorfield/next.jdbc "1.0.424"]
-                 [org.postgresql/postgresql "42.2.12"]]
+                 [org.postgresql/postgresql "42.2.12"]
+                 [org.xerial/sqlite-jdbc "3.30.1"]]
   :profiles {:feature/hsqldb {:dependencies [[org.hsqldb/hsqldb "2.4.0"]]}
              :test {:dependencies [[clj-commons/conch "0.9.2"]
                                    [com.clojure-goes-fast/clj-async-profiler "0.4.1"]]}

@@ -29,9 +29,9 @@ then
 fi
 
 if [ -z "$BABASHKA_JAR" ]; then
-   lein with-profiles "+reflection,$BABASHKA_LEIN_PROFILES" do run
-   lein with-profiles "$BABASHKA_LEIN_PROFILES" do clean, uberjar
-  BABASHKA_JAR=${BABASHKA_JAR:-"target/babashka-$BABASHKA_VERSION-standalone.jar"}
+    lein with-profiles "+reflection,$BABASHKA_LEIN_PROFILES" do run
+    lein with-profiles "+uberjar,$BABASHKA_LEIN_PROFILES" do clean, uberjar
+    BABASHKA_JAR=${BABASHKA_JAR:-"target/babashka-$BABASHKA_VERSION-standalone.jar"}
 fi
 
 BABASHKA_BINARY=${BABASHKA_BINARY:-"bb"}
@@ -61,9 +61,23 @@ if [ "$BABASHKA_STATIC" = "true" ]; then
     args+=("--static")
 fi
 
+args+=("--initialize-at-build-time=org.sqlite.JDBC"
+       "--initialize-at-build-time=org.sqlite.core.DB\$ProgressObserver"
+       "--initialize-at-build-time=org.sqlite.core.DB"
+       "--initialize-at-build-time=org.sqlite.core.NativeDB"
+       "--initialize-at-build-time=org.sqlite.ProgressHandler"
+       "--initialize-at-build-time=org.sqlite.Function"
+       "--initialize-at-build-time=org.sqlite.Function\$Aggregate"
+       "--initialize-at-build-time=org.sqlite.Function\$Window"
+       "-H:JNIConfigurationFiles=jni.json")
+
+args+=("-H:IncludeResources=db/.*|static/.*|templates/.*|.*.yml|.*.xml|.*/org/sqlite/.*|org/sqlite/.*")
+
 if [ "$BABASHKA_FEATURE_HSQLDB" = "true" ]; then
     args+=("-H:IncludeResources=org/hsqldb/.*\.properties", "-H:IncludeResources=org/hsqldb/.*\.sql")
 fi
+
+echo "${args[@]}"
 
 $GRAALVM_HOME/bin/native-image "${args[@]}"
 

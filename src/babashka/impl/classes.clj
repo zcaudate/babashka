@@ -186,6 +186,16 @@
           java.util.zip.GZIPOutputStream
           org.yaml.snakeyaml.error.YAMLException
           ~(symbol "[B")
+          java.sql.Statement
+          org.sqlite.core.DB
+          org.sqlite.core.NativeDB
+          org.sqlite.BusyHandler
+          org.sqlite.Function
+          org.sqlite.Function$Aggregate
+          org.sqlite.Function$Window
+          org.sqlite.ProgressHandler
+          org.sqlite.core.DB$ProgressObserver
+          ~(symbol "[Z")
           ~@(when features/hsqldb? [`org.hsqldb.jdbcDriver])]
     :constructors [clojure.lang.Delay
                    clojure.lang.MapEntry
