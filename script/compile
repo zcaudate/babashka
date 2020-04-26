@@ -55,6 +55,8 @@ args=( -jar $BABASHKA_JAR \
             --no-server \
             --report-unsupported-elements-at-runtime \
             "--initialize-at-run-time=org.postgresql.sspi.SSPIClient" \
+            "--initialize-at-run-time=org.mariadb.jdbc.credential.aws" \
+            "--initialize-at-run-time=org.mariadb.jdbc.internal.com.send.authentication.SendPamAuthPacket" \
             "$BABASHKA_XMX" )
 
 if [ "$BABASHKA_STATIC" = "true" ]; then

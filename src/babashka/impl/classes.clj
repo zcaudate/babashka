@@ -186,7 +186,9 @@
           java.util.zip.GZIPOutputStream
           org.yaml.snakeyaml.error.YAMLException
           ~(symbol "[B")
-          ~@(when features/hsqldb? [`org.hsqldb.jdbcDriver])]
+          ~@(when features/hsqldb? [`org.hsqldb.jdbcDriver])
+          org.mariadb.jdbc.Driver]
+    ;; https://medium.com/@jegvoorneveld/using-graal-aot-for-a-realistic-project-c8ea8eb3d263
     :constructors [clojure.lang.Delay
                    clojure.lang.MapEntry
                    clojure.lang.LineNumberingPushbackReader

@@ -17,3 +17,13 @@ public final class CutOffCoreServicesDependencies {
 @Delete
 final class Target_apple_security_KeychainStore {
 }
+
+@Delete
+@TargetClass(className = "org.mariadb.jdbc.internal.com.send.authentication.SendPamAuthPacket")
+final class Target_org_mariadb_jdbc_internal_com_send_authentication_SendPamAuthPacket {
+}
+
+// @Delete
+// @TargetClass(className = "org.mariadb.jdbc.credential.aws.AwsCredentialGenerator")
+// final class Target_org_mariadb_jdbc_credential_aws_AwsCredentialGenerator {
+// }
