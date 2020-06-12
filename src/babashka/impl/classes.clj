@@ -90,7 +90,13 @@
           java.io.File
           java.io.InputStream
           java.io.IOException
+          ;;java.io.ObjectInputStream
+          ;;java.io.ObjectOutputStream
           java.io.OutputStream
+          ;; java.io.DataInputStream
+          ;; java.io.DataInput
+          ;; java.io.DataOutput
+          ;; java.io.DataOutputStream
           java.io.FileReader
           java.io.InputStreamReader
           java.io.PushbackInputStream
@@ -119,6 +125,7 @@
           java.lang.Process
           java.lang.ProcessBuilder
           java.lang.ProcessBuilder$Redirect
+          ;; java.lang.reflect.Method
           java.lang.Runtime
           java.lang.RuntimeException
           java.lang.Short
@@ -195,6 +202,7 @@
           java.util.jar.JarFile
           java.util.jar.JarEntry
           java.util.jar.JarFile$JarFileEntry
+          ;; java.util.Locale
           java.util.Random
           java.util.regex.Pattern
           java.util.Base64
@@ -227,12 +235,23 @@
                       clojure.lang.IEditableCollection
                       clojure.lang.IMapEntry
                       clojure.lang.IPersistentMap
+                      ;; clojure.lang.APersistentMap
                       clojure.lang.IPersistentVector
+                      ;; clojure.lang.APersistentVector
+                      ;; clojure.lang.IPersistentSet
+                      ;; clojure.lang.APersistentSet
                       clojure.lang.IRecord
                       clojure.lang.ISeq
                       clojure.lang.Named
                       clojure.lang.Keyword
-                      clojure.lang.Symbol]
+                      ;; clojure.lang.LazySeq
+                      ;; clojure.lang.PersistentList
+                      ;; clojure.lang.PersistentTreeSet
+                      ;; clojure.lang.PersistentTreeMap
+                      ;; clojure.lang.Ratio
+                      ;; clojure.lang.Symbol
+                      ;; java.io.Serializable
+                      ]
     :custom ~custom-map})
 
 (defmacro gen-class-map []
