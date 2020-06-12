@@ -221,7 +221,8 @@
           java.util.zip.GZIPOutputStream
           ~(symbol "[B")
           ~@(when features/yaml? '[org.yaml.snakeyaml.error.YAMLException])
-          ~@(when features/hsqldb? '[org.hsqldb.jdbcDriver])]
+          ~@(when features/hsqldb? '[org.hsqldb.jdbcDriver])
+          net.jpountz.lz4.LZ4JavaSafeCompressor]
     :constructors [clojure.lang.Delay
                    clojure.lang.MapEntry
                    clojure.lang.LineNumberingPushbackReader
