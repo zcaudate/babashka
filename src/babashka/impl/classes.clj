@@ -249,7 +249,7 @@
                       ;; clojure.lang.PersistentTreeSet
                       ;; clojure.lang.PersistentTreeMap
                       ;; clojure.lang.Ratio
-                      ;; clojure.lang.Symbol
+                      clojure.lang.Symbol
                       ;; java.io.Serializable
                       ]
     :custom ~custom-map})
