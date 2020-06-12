@@ -222,7 +222,8 @@
           ~(symbol "[B")
           ~@(when features/yaml? '[org.yaml.snakeyaml.error.YAMLException])
           ~@(when features/hsqldb? '[org.hsqldb.jdbcDriver])
-          net.jpountz.lz4.LZ4JavaSafeCompressor]
+          net.jpountz.lz4.LZ4JavaSafeCompressor
+          net.jpountz.lz4.LZ4HCJavaSafeCompressor]
     :constructors [clojure.lang.Delay
                    clojure.lang.MapEntry
                    clojure.lang.LineNumberingPushbackReader
