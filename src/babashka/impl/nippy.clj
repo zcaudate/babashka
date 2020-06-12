@@ -8,4 +8,6 @@
 
 (def nippy-namespace
   {'freeze (copy-var nippy/freeze tns)
-   'thaw (copy-var nippy/thaw tns)})
+   'freeze-to-file (copy-var nippy/freeze-to-file tns)
+   'thaw (copy-var nippy/thaw tns)
+   'thaw-from-file (copy-var nippy/thaw-from-file tns)})
