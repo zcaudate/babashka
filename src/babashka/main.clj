@@ -5,6 +5,7 @@
    [babashka.impl.cheshire :refer [cheshire-core-namespace]]
    [babashka.impl.classes :as classes]
    [babashka.impl.classpath :as cp]
+   [babashka.impl.clj-http :refer [clj-http-client-namespace]]
    [babashka.impl.clojure.core :as core :refer [core-extras]]
    [babashka.impl.clojure.java.io :refer [io-namespace]]
    [babashka.impl.clojure.java.shell :refer [shell-namespace]]
@@ -367,7 +368,8 @@ If neither -e, -f, or --socket-repl are specified, then the first argument that 
        'babashka.curl curl-namespace
        'babashka.pods pods/pods-namespace
        'bencode.core bencode-namespace
-       'flatland.ordered.map ordered-map-ns}
+       'flatland.ordered.map ordered-map-ns
+       'clj-http.client clj-http-client-namespace}
     features/xml?  (assoc 'clojure.data.xml @(resolve 'babashka.impl.xml/xml-namespace))
     features/yaml? (assoc 'clj-yaml.core @(resolve 'babashka.impl.yaml/yaml-namespace))
     features/jdbc? (assoc 'next.jdbc @(resolve 'babashka.impl.jdbc/njdbc-namespace)
