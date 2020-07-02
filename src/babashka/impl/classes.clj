@@ -99,6 +99,7 @@
           java.io.StringReader
           java.io.StringWriter
           java.io.Writer
+          java.lang.AbstractMethodError
           java.lang.ArithmeticException
           java.lang.AssertionError
           java.lang.Boolean
@@ -126,6 +127,7 @@
           java.lang.StringBuilder
           java.lang.System
           java.lang.Throwable
+          java.lang.reflect.Method
           java.math.BigDecimal
           java.math.BigInteger
           java.net.ConnectException
@@ -227,7 +229,13 @@
     :methods [borkdude.graal.LockFix] ;; support for locking
 
     :fields [clojure.lang.PersistentQueue]
-    :instance-checks [clojure.lang.IObj
+    :instance-checks [clojure.lang.APersistentMap
+                      clojure.lang.LazySeq
+                      clojure.lang.Atom
+                      clojure.lang.Ref
+                      clojure.lang.Agent
+                      clojure.lang.IRef
+                      clojure.lang.IObj
                       clojure.lang.IFn
                       clojure.lang.IPending
                       clojure.lang.IDeref
